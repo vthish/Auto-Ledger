@@ -1,0 +1,25 @@
+# --- General ---
+.DS_Store
+.env
+.idea/
+.vscode/
+
+# --- Nest.js Backend ---
+backend/nest-api/node_modules/
+backend/nest-api/dist/
+backend/nest-api/npm-debug.log
+backend/nest-api/yarn-error.log
+
+# --- Flutter Frontends ---
+**/build/
+**/.dart_tool/
+**/.flutter-plugins
+**/.flutter-plugins-dependencies
+**/.pub-cache/
+**/.packages
+**/ios/Pods/
+**/ios/.symlinks/
+**/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+
+# --- Docker ---
+docker-compose.override.yml
