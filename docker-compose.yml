@@ -1,0 +1,25 @@
+services:
+  # PostgreSQL Database for Auto-Ledger
+  db:
+    image: postgres:15-alpine
+    container_name: auto-ledger-db
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: auto_ledger_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Redis for OTP and Real-time caching
+  redis:
+    image: redis:alpine
+    container_name: auto-ledger-redis
+    restart: always
+    ports:
+      - "6379:6379"
+
+volumes:
+  postgres_data:
