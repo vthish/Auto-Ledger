@@ -1,16 +1,17 @@
-const express = require("express");
-const cors = require("cors");
+const express = require('express');
+const cors = require('cors');
 
 const app = express();
 const PORT = 4000;
 
-// Enable CORS to allow requests from our NestJS backend (localhost:3000 -> localhost:4000)
+// Enable CORS to allow requests from the NestJS backend
 app.use(cors());
 app.use(express.json());
 
 // Mock Database containing realistic Sri Lankan License Data
 const mockDmtDatabase = {
-  200204802139: {
+  // License 1: User's original reference data
+  "200204802139": {
     licenseNumber: "B5744142",
     fullName: "KAPPITIYAGODA VITHANAGE VENUSHA THISHAN",
     address: "269 SOUTHERNCOURT MANAVILA WALAHANDUWA GALLE",
@@ -22,11 +23,12 @@ const mockDmtDatabase = {
       { class: "A", issueDate: "2022-07-05", expiryDate: "2030-07-05" },
       { class: "B1", issueDate: "2022-07-05", expiryDate: "2030-07-05" },
       { class: "B", issueDate: "2022-07-05", expiryDate: "2030-07-05" },
-      { class: "G1", issueDate: "2022-07-05", expiryDate: "2030-07-05" },
-    ],
+      { class: "G1", issueDate: "2022-07-05", expiryDate: "2030-07-05" }
+    ]
   },
-  // Adding a second dummy user for testing 'Not Found' or other scenarios later
-  199812345678: {
+  
+  // License 2: Sample standard driver
+  "199812345678": {
     licenseNumber: "B1234567",
     fullName: "SAMPLE DRIVER NAME",
     address: "123 COLOMBO ROAD, GALLE",
@@ -34,13 +36,28 @@ const mockDmtDatabase = {
     bloodGroup: "A+",
     dateOfIssue: "2020-01-15",
     vehicleCategories: [
-      { class: "B", issueDate: "2020-01-15", expiryDate: "2028-01-15" },
-    ],
+      { class: "B", issueDate: "2020-01-15", expiryDate: "2028-01-15" }
+    ]
   },
+
+  // License 3: Newly added mock license (Heavy vehicle driver)
+  "199012345678": {
+    licenseNumber: "B9988776",
+    fullName: "KAMAL PERERA",
+    address: "789 TEMPLE ROAD, KANDY",
+    dob: "1990-03-15",
+    bloodGroup: "AB+",
+    dateOfIssue: "2018-06-20",
+    vehicleCategories: [
+      { class: "A", issueDate: "2018-06-20", expiryDate: "2026-06-20" },
+      { class: "B", issueDate: "2018-06-20", expiryDate: "2026-06-20" },
+      { class: "C", issueDate: "2021-09-10", expiryDate: "2029-09-10" }
+    ]
+  }
 };
 
 // GET Endpoint to fetch license details by NIC
-app.get("/api/dmt/license/:nic", (req, res) => {
+app.get('/api/dmt/license/:nic', (req, res) => {
   const userNic = req.params.nic;
   const licenseDetails = mockDmtDatabase[userNic];
 
@@ -48,13 +65,13 @@ app.get("/api/dmt/license/:nic", (req, res) => {
     // Return 200 OK with data if NIC is found
     res.status(200).json({
       success: true,
-      data: licenseDetails,
+      data: licenseDetails
     });
   } else {
     // Return 404 Not Found if NIC is not in the mock database
     res.status(404).json({
       success: false,
-      message: "No driving license found for the provided NIC number",
+      message: "No driving license found for the provided NIC number"
     });
   }
 });
