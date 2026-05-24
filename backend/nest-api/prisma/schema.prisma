@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -15,19 +12,96 @@ model User {
   nic         String   @unique
   phoneNumber String   @unique
   name        String
-
-  // Establishes a one-to-one relationship with the License model
   license     License? 
 }
 
 model License {
-  id            String   @id @default(uuid())
-  licenseNumber String   @unique
-  issueDate     DateTime @default(now())
-  expiryDate    DateTime
-  points        Int      @default(0) // Default violation points start at 0
+  id                      String        @id @default(uuid())
+  licenseNumber           String        @unique
+  issueDate               DateTime      @default(now())
+  expiryDate              DateTime
+  points                  Int           @default(0)
+  
+  status                  LicenseStatus @default(ACTIVE)
+  temporaryLicenseExpiry  DateTime?     
 
-  // Foreign key mapping to the User model
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                  String        @unique
+  user                    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fines                   Fine[]        
+}
+
+model District {
+  id            String    @id @default(uuid())
+  name          String    @unique
+  
+  headOfficerId String?   @unique 
+  officers      Officer[]
+}
+
+model Officer {
+  id            String      @id @default(uuid())
+  badgeNumber   String      @unique
+  name          String
+  password      String      
+  role          OfficerRole @default(TRAFFIC_OFFICER)
+  
+  districtId    String
+  district      District    @relation(fields: [districtId], references: [id])
+  finesIssued   Fine[]
+  shifts        Shift[]
+}
+
+model Shift {
+  id          String   @id @default(uuid())
+  startTime   DateTime
+  endTime     DateTime
+  isActive    Boolean  @default(true)
+  
+  officerId   String
+  officer     Officer  @relation(fields: [officerId], references: [id], onDelete: Cascade)
+}
+
+model OffenseCategory {
+  id          String   @id @default(uuid())
+  code        String   @unique 
+  name        String   
+  amount      Float    
+  points      Int      
+  
+  fines       Fine[]
+}
+
+model Fine {
+  id                String          @id @default(uuid())
+  issuedAt          DateTime        @default(now())
+  dueDate           DateTime   
+  status            FineStatus      @default(PENDING) 
+  
+  licenseId         String
+  license           License         @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+  
+  officerId         String
+  officer           Officer         @relation(fields: [officerId], references: [id])
+  
+  offenseCategoryId String
+  offenseCategory   OffenseCategory @relation(fields: [offenseCategoryId], references: [id])
+}
+
+enum LicenseStatus {
+  ACTIVE      
+  SUSPENDED   
+  REVOKED     
+}
+
+enum FineStatus {
+  PENDING     
+  PAID        
+  OVERDUE     
+  COURT_CASE  
+}
+
+enum OfficerRole {
+  TRAFFIC_OFFICER
+  DIVISIONAL_HEAD
+  SYSTEM_ADMIN
 }
