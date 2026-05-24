@@ -13,13 +13,12 @@ import { LicenseService } from './license.service';
 export class LicenseController {
   constructor(private readonly licenseService: LicenseService) {}
 
-  // POST endpoint to issue a new license
+  // POST endpoint to issue a new license automatically via DMT integration
   @Post('issue')
   async issueLicense(
     @Body()
     licenseData: {
-      licenseNumber: string;
-      expiryDate: string;
+      nic: string;
       userId: string;
     },
   ) {
