@@ -12,92 +12,93 @@ model User {
   nic         String   @unique
   phoneNumber String   @unique
   name        String
-  license     License? 
+  license     License?
 }
 
 model License {
-  id                      String        @id @default(uuid())
-  licenseNumber           String        @unique
-  issueDate               DateTime      @default(now())
-  expiryDate              DateTime
-  points                  Int           @default(0)
-  
-  status                  LicenseStatus @default(ACTIVE)
-  temporaryLicenseExpiry  DateTime?     
+  id                     String        @id @default(uuid())
+  licenseNumber          String        @unique
+  issueDate              DateTime      @default(now())
+  expiryDate             DateTime
+  points                 Int           @default(0)
+  status                 LicenseStatus @default(ACTIVE)
+  temporaryLicenseExpiry DateTime?
 
-  userId                  String        @unique
-  user                    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fines                   Fine[]        
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fines  Fine[]
 }
 
 model District {
   id            String    @id @default(uuid())
   name          String    @unique
-  
-  headOfficerId String?   @unique 
+  headOfficerId String?   @unique
   officers      Officer[]
 }
 
 model Officer {
-  id            String      @id @default(uuid())
-  badgeNumber   String      @unique
-  name          String
-  password      String      
-  role          OfficerRole @default(TRAFFIC_OFFICER)
-  
-  districtId    String
-  district      District    @relation(fields: [districtId], references: [id])
-  finesIssued   Fine[]
-  shifts        Shift[]
+  id          String      @id @default(uuid())
+  badgeNumber String      @unique
+  name        String
+  password    String
+  role        OfficerRole @default(TRAFFIC_OFFICER)
+
+  districtId  String
+  district    District @relation(fields: [districtId], references: [id])
+  finesIssued Fine[]
+  shifts      Shift[]
 }
 
 model Shift {
-  id          String   @id @default(uuid())
-  startTime   DateTime
-  endTime     DateTime
-  isActive    Boolean  @default(true)
-  
-  officerId   String
-  officer     Officer  @relation(fields: [officerId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  startTime DateTime
+  endTime   DateTime
+  isActive  Boolean  @default(true)
+
+  officerId String
+  officer   Officer @relation(fields: [officerId], references: [id], onDelete: Cascade)
 }
 
 model OffenseCategory {
-  id          String   @id @default(uuid())
-  code        String   @unique 
-  name        String   
-  amount      Float    
-  points      Int      
-  
-  fines       Fine[]
+  id          String  @id @default(uuid())
+  code        String  @unique
+  name        String
+  amount      Float
+  points      Int
+  isCourtCase Boolean @default(false)
+
+  fines Fine[]
 }
 
 model Fine {
-  id                String          @id @default(uuid())
-  issuedAt          DateTime        @default(now())
-  dueDate           DateTime   
-  status            FineStatus      @default(PENDING) 
-  
-  licenseId         String
-  license           License         @relation(fields: [licenseId], references: [id], onDelete: Cascade)
-  
-  officerId         String
-  officer           Officer         @relation(fields: [officerId], references: [id])
-  
+  id       String     @id @default(uuid())
+  issuedAt DateTime   @default(now())
+  dueDate  DateTime?
+  status   FineStatus @default(PENDING)
+
+  licenseId String
+  license   License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  officerId String
+  officer   Officer @relation(fields: [officerId], references: [id])
+
   offenseCategoryId String
   offenseCategory   OffenseCategory @relation(fields: [offenseCategoryId], references: [id])
 }
 
 enum LicenseStatus {
-  ACTIVE      
-  SUSPENDED   
-  REVOKED     
+  ACTIVE
+  SUSPENDED
+  REVOKED
+  COURT_PENDING
 }
 
 enum FineStatus {
-  PENDING     
-  PAID        
-  OVERDUE     
-  COURT_CASE  
+  PENDING
+  PAID
+  OVERDUE
+  COURT_CASE
+  RESOLVED
 }
 
 enum OfficerRole {
