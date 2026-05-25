@@ -4,9 +4,10 @@ import { Injectable } from '@nestjs/common';
 
 interface JwtPayload {
   sub: string;
-  badgeNumber: string;
   role: string;
-  districtId: string;
+  badgeNumber?: string;
+  districtId?: string;
+  nic?: string;
 }
 
 @Injectable()
@@ -20,6 +21,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload) {
+    if (payload.role === 'DRIVER') {
+      return {
+        id: payload.sub,
+        role: payload.role,
+        nic: payload.nic,
+      };
+    }
+
     return {
       id: payload.sub,
       badgeNumber: payload.badgeNumber,

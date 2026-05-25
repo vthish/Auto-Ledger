@@ -8,11 +8,14 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(uuid())
-  nic         String   @unique
-  phoneNumber String   @unique
-  name        String
-  license     License?
+  id              String   @id @default(uuid())
+  nic             String   @unique
+  phoneNumber     String   @unique
+  name            String
+  password        String
+  deviceId        String?
+  isPhoneVerified Boolean  @default(false)
+  license         License?
 }
 
 model License {
