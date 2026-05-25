@@ -8,35 +8,101 @@ datasource db {
 }
 
 model User {
-  id          String    @id @default(uuid())
-  nic         String    @unique
-  phoneNumber String    @unique
+  id          String   @id @default(uuid())
+  nic         String   @unique
+  phoneNumber String   @unique
   name        String
-  
-  // Relations 
-  license     License?  
-  fines       Fine[]    
+  license     License?
 }
 
 model License {
-  id            String  @id @default(uuid())
-  licenseNumber String  @unique
-  status        String  @default("ACTIVE") 
-  demeritPoints Int     @default(0)
-  
-  // Relation to User
-  userId        String  @unique 
-  user          User    @relation(fields: [userId], references: [id])
+  id                     String        @id @default(uuid())
+  licenseNumber          String        @unique
+  issueDate              DateTime      @default(now())
+  expiryDate             DateTime
+  points                 Int           @default(0)
+  status                 LicenseStatus @default(ACTIVE)
+  temporaryLicenseExpiry DateTime?
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fines  Fine[]
+}
+
+model District {
+  id            String    @id @default(uuid())
+  name          String    @unique
+  headOfficerId String?   @unique
+  officers      Officer[]
+}
+
+model Officer {
+  id          String      @id @default(uuid())
+  badgeNumber String      @unique
+  name        String
+  password    String
+  role        OfficerRole @default(TRAFFIC_OFFICER)
+
+  districtId  String
+  district    District @relation(fields: [districtId], references: [id])
+  finesIssued Fine[]
+  shifts      Shift[]
+}
+
+model Shift {
+  id        String   @id @default(uuid())
+  startTime DateTime
+  endTime   DateTime
+  isActive  Boolean  @default(true)
+
+  officerId String
+  officer   Officer @relation(fields: [officerId], references: [id], onDelete: Cascade)
+}
+
+model OffenseCategory {
+  id          String  @id @default(uuid())
+  code        String  @unique
+  name        String
+  amount      Float
+  points      Int
+  isCourtCase Boolean @default(false)
+
+  fines Fine[]
 }
 
 model Fine {
-  id            String   @id @default(uuid())
-  amount        Float
-  violation     String
-  status        String   @default("UNPAID") 
-  issuedAt      DateTime @default(now())
+  id       String     @id @default(uuid())
+  issuedAt DateTime   @default(now())
+  dueDate  DateTime?
+  status   FineStatus @default(PENDING)
 
-  // Relation to User
-  userId        String  
-  user          User     @relation(fields: [userId], references: [id])
+  licenseId String
+  license   License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
+
+  officerId String
+  officer   Officer @relation(fields: [officerId], references: [id])
+
+  offenseCategoryId String
+  offenseCategory   OffenseCategory @relation(fields: [offenseCategoryId], references: [id])
+}
+
+enum LicenseStatus {
+  ACTIVE
+  SUSPENDED
+  REVOKED
+  COURT_PENDING
+}
+
+enum FineStatus {
+  PENDING
+  PAID
+  OVERDUE
+  COURT_CASE
+  RESOLVED
+}
+
+enum OfficerRole {
+  TRAFFIC_OFFICER
+  DIVISIONAL_HEAD
+  SYSTEM_ADMIN
 }
