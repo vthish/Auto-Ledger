@@ -63,4 +63,9 @@ export class FinesController {
     const officerId = req.user.id;
     return this.finesService.getOfficerFineHistory(officerId);
   }
+  @Get('my-history')
+  async getMyFineHistory(@Req() req: AuthenticatedRequest) {
+    const userId = req.user.id;
+    return this.finesService.getDriverFineHistory(userId);
+  }
 }

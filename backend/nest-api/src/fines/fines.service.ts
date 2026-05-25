@@ -211,4 +211,24 @@ export class FinesService {
       orderBy: { issuedAt: 'desc' },
     });
   }
+  async getDriverFineHistory(userId: string) {
+    const license = await this.prisma.license.findUnique({
+      where: { userId },
+    });
+
+    if (!license) {
+      throw new NotFoundException('No driving license found for this user.');
+    }
+
+    return this.prisma.fine.findMany({
+      where: { licenseId: license.id },
+      include: {
+        offenseCategory: {
+          select: { name: true, points: true, fineAmount: true },
+        },
+        officer: { select: { badgeNumber: true } },
+      },
+      orderBy: { issuedAt: 'desc' },
+    });
+  }
 }

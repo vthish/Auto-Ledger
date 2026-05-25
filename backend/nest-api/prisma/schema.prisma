@@ -63,14 +63,13 @@ model Shift {
 }
 
 model OffenseCategory {
-  id          String  @id @default(uuid())
-  code        String  @unique
+  id          String   @id @default(uuid())
+  code        String   @unique
   name        String
-  amount      Float
   points      Int
-  isCourtCase Boolean @default(false)
-
-  fines Fine[]
+  isCourtCase Boolean  @default(false)
+  fineAmount  Float    @default(0.0) 
+  fines       Fine[]
 }
 
 model Fine {
