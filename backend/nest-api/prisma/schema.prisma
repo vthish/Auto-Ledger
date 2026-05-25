@@ -68,7 +68,7 @@ model OffenseCategory {
   name        String
   points      Int
   isCourtCase Boolean  @default(false)
-  fineAmount  Float    @default(0.0) 
+  amount      Float    @default(0.0) 
   fines       Fine[]
 }
 

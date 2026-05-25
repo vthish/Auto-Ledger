@@ -27,7 +27,7 @@ export class FinesController {
   async issueFine(
     @Body()
     fineData: {
-      licenseNumber: string;
+      qrToken: string;
       offenseCode: string;
       officerId: string;
     },
@@ -63,6 +63,7 @@ export class FinesController {
     const officerId = req.user.id;
     return this.finesService.getOfficerFineHistory(officerId);
   }
+
   @Get('my-history')
   async getMyFineHistory(@Req() req: AuthenticatedRequest) {
     const userId = req.user.id;

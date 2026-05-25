@@ -97,7 +97,7 @@ async function main() {
   for (const offense of offenses) {
     await prisma.offenseCategory.upsert({
       where: { code: offense.code },
-      update: {},
+      update: offense,
       create: offense,
     });
   }
@@ -145,8 +145,9 @@ async function main() {
       districtId: mataraDistrict.id,
     },
   });
+
+  console.log('Seeding completed successfully!');
 }
-console.log('Seeding completed successfully!');
 
 main()
   .catch((e) => {

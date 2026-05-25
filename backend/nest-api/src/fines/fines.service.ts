@@ -5,17 +5,38 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { JwtService } from '@nestjs/jwt';
 import { LicenseStatus, FineStatus } from '@prisma/client';
+
+interface QrPayload {
+  userId: string;
+  nic: string;
+  licenseNumber: string;
+}
 
 @Injectable()
 export class FinesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+  ) {}
 
   async issueFine(data: {
-    licenseNumber: string;
+    qrToken: string;
     offenseCode: string;
     officerId: string;
   }) {
+    let licenseNumber = '';
+
+    try {
+      const decoded: QrPayload = this.jwtService.verify(data.qrToken);
+      licenseNumber = decoded.licenseNumber;
+    } catch {
+      throw new UnauthorizedException(
+        'QR Token Expired or Invalid! Please scan the driver app again.',
+      );
+    }
+
     const officer = await this.prisma.officer.findUnique({
       where: { id: data.officerId },
       include: { shifts: { where: { isActive: true } } },
@@ -61,7 +82,7 @@ export class FinesService {
     }
 
     const license = await this.prisma.license.findUnique({
-      where: { licenseNumber: data.licenseNumber },
+      where: { licenseNumber },
     });
 
     if (!license) {
@@ -104,6 +125,12 @@ export class FinesService {
           licenseId: license.id,
           officerId: data.officerId,
           offenseCategoryId: offense.id,
+        },
+        // මෙතනින් තමයි දඩ මුදලයි නමයි රිටර්න් කරන්න include කළේ
+        include: {
+          offenseCategory: {
+            select: { name: true, amount: true },
+          },
         },
       });
 
@@ -211,6 +238,7 @@ export class FinesService {
       orderBy: { issuedAt: 'desc' },
     });
   }
+
   async getDriverFineHistory(userId: string) {
     const license = await this.prisma.license.findUnique({
       where: { userId },
@@ -224,7 +252,7 @@ export class FinesService {
       where: { licenseId: license.id },
       include: {
         offenseCategory: {
-          select: { name: true, points: true, fineAmount: true },
+          select: { name: true, points: true, amount: true },
         },
         officer: { select: { badgeNumber: true } },
       },
