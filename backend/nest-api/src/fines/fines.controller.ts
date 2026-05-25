@@ -69,4 +69,13 @@ export class FinesController {
     const userId = req.user.id;
     return this.finesService.getDriverFineHistory(userId);
   }
+
+  @Post('pay/:fineId')
+  async payDummyFine(
+    @Param('fineId') fineId: string,
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user.id;
+    return this.finesService.payFine(fineId, userId);
+  }
 }

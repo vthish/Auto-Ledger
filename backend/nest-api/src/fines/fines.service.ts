@@ -126,7 +126,6 @@ export class FinesService {
           officerId: data.officerId,
           offenseCategoryId: offense.id,
         },
-        // මෙතනින් තමයි දඩ මුදලයි නමයි රිටර්න් කරන්න include කළේ
         include: {
           offenseCategory: {
             select: { name: true, amount: true },
@@ -257,6 +256,60 @@ export class FinesService {
         officer: { select: { badgeNumber: true } },
       },
       orderBy: { issuedAt: 'desc' },
+    });
+  }
+
+  async payFine(fineId: string, userId: string) {
+    const fine = await this.prisma.fine.findUnique({
+      where: { id: fineId },
+      include: { license: true },
+    });
+
+    if (!fine || fine.license.userId !== userId) {
+      throw new NotFoundException(
+        'Fine not found or you do not have permission to pay this.',
+      );
+    }
+
+    if (fine.status !== FineStatus.PENDING) {
+      throw new BadRequestException(
+        'This fine cannot be paid. It may already be paid or is a court case.',
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updatedFine = await tx.fine.update({
+        where: { id: fineId },
+        data: { status: FineStatus.PAID },
+      });
+
+      const otherPendingFines = await tx.fine.findMany({
+        where: {
+          licenseId: fine.licenseId,
+          status: FineStatus.PENDING,
+          id: { not: fineId },
+        },
+      });
+
+      if (otherPendingFines.length === 0) {
+        await tx.license.update({
+          where: { id: fine.licenseId },
+          data: {
+            status: LicenseStatus.ACTIVE,
+            temporaryLicenseExpiry: null,
+          },
+        });
+      }
+
+      return {
+        success: true,
+        message: 'Payment successful.',
+        fineDetails: updatedFine,
+        licenseStatus:
+          otherPendingFines.length === 0
+            ? LicenseStatus.ACTIVE
+            : LicenseStatus.SUSPENDED,
+      };
     });
   }
 }
