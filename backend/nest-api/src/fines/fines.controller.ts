@@ -6,9 +6,17 @@ import {
   Param,
   Patch,
   UseGuards,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
 import { FinesService } from './fines.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+
+interface AuthenticatedRequest extends Request {
+  user: {
+    id: string;
+  };
+}
 
 @UseGuards(JwtAuthGuard)
 @Controller('fines')
@@ -38,5 +46,21 @@ export class FinesController {
   @Get('district/:districtId/court-cases')
   async getDistrictCourtCases(@Param('districtId') districtId: string) {
     return this.finesService.getCourtCasesByDistrict(districtId);
+  }
+
+  @Get('offenses')
+  async getOffenses() {
+    return this.finesService.getOffenses();
+  }
+
+  @Get('verify-license/:licenseNumber')
+  async verifyLicense(@Param('licenseNumber') licenseNumber: string) {
+    return this.finesService.verifyLicense(licenseNumber);
+  }
+
+  @Get('history')
+  async getOfficerHistory(@Req() req: AuthenticatedRequest) {
+    const officerId = req.user.id;
+    return this.finesService.getOfficerFineHistory(officerId);
   }
 }
