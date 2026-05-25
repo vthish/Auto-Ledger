@@ -25,7 +25,8 @@ export class OfficersController {
       badgeNumber: string;
       name: string;
       password: string;
-      districtName: string;
+      role?: string;
+      districtId: string;
     },
   ) {
     return this.officersService.registerOfficer(officerData);

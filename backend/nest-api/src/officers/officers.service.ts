@@ -74,7 +74,7 @@ export class OfficersService {
     badgeNumber: string;
     name: string;
     password: string;
-    districtName: string;
+    districtId: string;
   }) {
     const existingOfficer = await this.prisma.officer.findUnique({
       where: { badgeNumber: data.badgeNumber },
@@ -87,7 +87,7 @@ export class OfficersService {
     }
 
     const district = await this.prisma.district.findUnique({
-      where: { name: data.districtName },
+      where: { id: data.districtId },
     });
 
     if (!district) {
