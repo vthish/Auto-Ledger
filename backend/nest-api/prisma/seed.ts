@@ -102,8 +102,51 @@ async function main() {
     });
   }
 
-  console.log('Seeding completed successfully!');
+  console.log('Seeding districts and divisional heads...');
+
+  const galleDistrict = await prisma.district.upsert({
+    where: { name: 'Galle' },
+    update: {},
+    create: {
+      id: 'district-galle',
+      name: 'Galle',
+    },
+  });
+
+  await prisma.officer.upsert({
+    where: { badgeNumber: 'HEAD-GALLE-01' },
+    update: {},
+    create: {
+      badgeNumber: 'HEAD-GALLE-01',
+      name: 'Saman Kumara',
+      password: 'headpassword123',
+      role: 'DIVISIONAL_HEAD',
+      districtId: galleDistrict.id,
+    },
+  });
+
+  const mataraDistrict = await prisma.district.upsert({
+    where: { name: 'Matara' },
+    update: {},
+    create: {
+      id: 'district-matara',
+      name: 'Matara',
+    },
+  });
+
+  await prisma.officer.upsert({
+    where: { badgeNumber: 'HEAD-MATARA-01' },
+    update: {},
+    create: {
+      badgeNumber: 'HEAD-MATARA-01',
+      name: 'Nimal Silva',
+      password: 'headpassword456',
+      role: 'DIVISIONAL_HEAD',
+      districtId: mataraDistrict.id,
+    },
+  });
 }
+console.log('Seeding completed successfully!');
 
 main()
   .catch((e) => {

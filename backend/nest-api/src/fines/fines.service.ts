@@ -84,7 +84,6 @@ export class FinesService {
 
     const newPoints = license.points + offense.points;
 
-    // Explicitly typed to prevent TypeScript strict literal and 'any' errors
     let newLicenseStatus: LicenseStatus = LicenseStatus.SUSPENDED;
     let newFineStatus: FineStatus = FineStatus.PENDING;
     let tempExpiryDate: Date | null = null;
@@ -168,6 +167,46 @@ export class FinesService {
         officer: { select: { badgeNumber: true, name: true } },
         offenseCategory: true,
         license: { select: { licenseNumber: true } },
+      },
+      orderBy: { issuedAt: 'desc' },
+    });
+  }
+
+  async getOffenses() {
+    return this.prisma.offenseCategory.findMany();
+  }
+
+  async verifyLicense(licenseNumber: string) {
+    const license = await this.prisma.license.findUnique({
+      where: { licenseNumber },
+      include: {
+        fines: {
+          orderBy: { issuedAt: 'desc' },
+          take: 3,
+          include: { offenseCategory: true },
+        },
+      },
+    });
+
+    if (!license) {
+      throw new NotFoundException('License not found in the system.');
+    }
+
+    return license;
+  }
+
+  async getOfficerFineHistory(officerId: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return this.prisma.fine.findMany({
+      where: {
+        officerId: officerId,
+        issuedAt: { gte: today },
+      },
+      include: {
+        license: { select: { licenseNumber: true } },
+        offenseCategory: { select: { name: true, points: true } },
       },
       orderBy: { issuedAt: 'desc' },
     });
