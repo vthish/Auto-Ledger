@@ -11,10 +11,14 @@ import {
 import { Request } from 'express';
 import { FinesService } from './fines.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 interface AuthenticatedRequest extends Request {
   user: {
     id: string;
+    role: string;
+    districtId?: string;
   };
 }
 
@@ -35,7 +39,10 @@ export class FinesController {
     return this.finesService.issueFine(fineData);
   }
 
+  // Update Court Case Verdict (Restricted to DIVISIONAL_HEAD)
   @Patch('court/:fineId/resolve')
+  @UseGuards(RolesGuard)
+  @Roles('DIVISIONAL_HEAD')
   async resolveCourtCase(
     @Param('fineId') fineId: string,
     @Body() data: { finalVerdict: 'ACTIVE' | 'REVOKED' },
@@ -43,8 +50,13 @@ export class FinesController {
     return this.finesService.resolveCourtCase(fineId, data.finalVerdict);
   }
 
-  @Get('district/:districtId/court-cases')
-  async getDistrictCourtCases(@Param('districtId') districtId: string) {
+  // Get Court Cases for Head's District (Restricted to DIVISIONAL_HEAD)
+  @Get('district/court-cases')
+  @UseGuards(RolesGuard)
+  @Roles('DIVISIONAL_HEAD')
+  async getDistrictCourtCases(@Req() req: AuthenticatedRequest) {
+    // Extract districtId directly from the validated token
+    const districtId = req.user.districtId;
     return this.finesService.getCourtCasesByDistrict(districtId);
   }
 

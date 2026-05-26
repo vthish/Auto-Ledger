@@ -19,6 +19,7 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
+  // Login for Police Officers and Divisional Heads
   async login(badgeNumber: string, pass: string) {
     const officer = await this.prisma.officer.findUnique({
       where: { badgeNumber },
@@ -28,9 +29,13 @@ export class AuthService {
       throw new UnauthorizedException('Invalid badge number or password.');
     }
 
+    // Normal check for newly registered officers (Hashed Passwords)
     const isPasswordValid = await bcrypt.compare(pass, officer.password);
 
-    if (!isPasswordValid) {
+    // Fallback for seeded users with plain-text passwords
+    const isSeededPassword = pass === officer.password;
+
+    if (!isPasswordValid && !isSeededPassword) {
       throw new UnauthorizedException('Invalid badge number or password.');
     }
 
@@ -52,6 +57,7 @@ export class AuthService {
     };
   }
 
+  // Generate JWT for Driver/User
   private generateUserToken(user: User) {
     const payload = {
       sub: user.id,
@@ -70,6 +76,7 @@ export class AuthService {
     };
   }
 
+  // Register Driver/User
   async registerUser(data: RegisterUserDto) {
     const existingUser = await this.prisma.user.findFirst({
       where: {
@@ -97,6 +104,7 @@ export class AuthService {
     return this.generateUserToken(user);
   }
 
+  // Login for Driver/User
   async loginUser(nic: string, pass: string, deviceId: string) {
     const user = await this.prisma.user.findUnique({
       where: { nic },
@@ -112,6 +120,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid NIC or password.');
     }
 
+    // Verify if logging in from a new device
     if (user.deviceId !== deviceId) {
       return {
         status: 'OTP_REQUIRED',
@@ -123,6 +132,7 @@ export class AuthService {
     return this.generateUserToken(user);
   }
 
+  // Device verification for Driver/User
   async verifyNewDevice(nic: string, newDeviceId: string) {
     const user = await this.prisma.user.update({
       where: { nic },
