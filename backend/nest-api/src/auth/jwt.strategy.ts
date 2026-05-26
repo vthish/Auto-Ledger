@@ -21,7 +21,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: JwtPayload) {
-    if (payload.role === 'DRIVER') {
+    if (payload.role === 'USER') {
       return {
         id: payload.sub,
         role: payload.role,

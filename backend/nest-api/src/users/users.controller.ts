@@ -1,30 +1,19 @@
 import {
   Controller,
-  Post,
-  Body,
   Get,
   Param,
   Patch,
+  Body,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
+@UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
-
-  @Post('register')
-  async registerUser(
-    @Body()
-    userData: {
-      nic: string;
-      phoneNumber: string;
-      name: string;
-      password: string;
-    },
-  ) {
-    return this.usersService.registerUser(userData);
-  }
 
   @Get(':id')
   async getUserById(@Param('id') id: string) {
