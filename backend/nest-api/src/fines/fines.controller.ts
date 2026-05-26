@@ -28,7 +28,7 @@ export class FinesController {
     @Body()
     fineData: {
       qrToken: string;
-      offenseCode: string;
+      offenseCodes: string[];
       officerId: string;
     },
   ) {
@@ -70,12 +70,21 @@ export class FinesController {
     return this.finesService.getDriverFineHistory(userId);
   }
 
-  @Post('pay/:fineId')
-  async payDummyFine(
-    @Param('fineId') fineId: string,
+  @Post('calculate-total')
+  async calculateTotal(
+    @Body() data: { fineIds: string[] },
     @Req() req: AuthenticatedRequest,
   ) {
     const userId = req.user.id;
-    return this.finesService.payFine(fineId, userId);
+    return this.finesService.calculateTotalAmount(data.fineIds, userId);
+  }
+
+  @Post('pay')
+  async payDummyFines(
+    @Body() data: { fineIds: string[] },
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user.id;
+    return this.finesService.payFines(data.fineIds, userId);
   }
 }
