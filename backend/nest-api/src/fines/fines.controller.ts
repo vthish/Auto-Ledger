@@ -11,10 +11,14 @@ import {
 import { Request } from 'express';
 import { FinesService } from './fines.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 interface AuthenticatedRequest extends Request {
   user: {
     id: string;
+    role: string;
+    districtId?: string;
   };
 }
 
@@ -27,8 +31,8 @@ export class FinesController {
   async issueFine(
     @Body()
     fineData: {
-      licenseNumber: string;
-      offenseCode: string;
+      qrToken: string;
+      offenseCodes: string[];
       officerId: string;
     },
   ) {
@@ -36,6 +40,8 @@ export class FinesController {
   }
 
   @Patch('court/:fineId/resolve')
+  @UseGuards(RolesGuard)
+  @Roles('DIVISIONAL_HEAD')
   async resolveCourtCase(
     @Param('fineId') fineId: string,
     @Body() data: { finalVerdict: 'ACTIVE' | 'REVOKED' },
@@ -43,9 +49,20 @@ export class FinesController {
     return this.finesService.resolveCourtCase(fineId, data.finalVerdict);
   }
 
-  @Get('district/:districtId/court-cases')
-  async getDistrictCourtCases(@Param('districtId') districtId: string) {
+  @Get('district/court-cases')
+  @UseGuards(RolesGuard)
+  @Roles('DIVISIONAL_HEAD')
+  async getDistrictCourtCases(@Req() req: AuthenticatedRequest) {
+    const districtId = req.user.districtId;
     return this.finesService.getCourtCasesByDistrict(districtId);
+  }
+
+  @Get('district/statistics')
+  @UseGuards(RolesGuard)
+  @Roles('DIVISIONAL_HEAD')
+  async getDistrictStatistics(@Req() req: AuthenticatedRequest) {
+    const districtId = req.user.districtId;
+    return this.finesService.getDistrictStatistics(districtId);
   }
 
   @Get('offenses')
@@ -62,5 +79,29 @@ export class FinesController {
   async getOfficerHistory(@Req() req: AuthenticatedRequest) {
     const officerId = req.user.id;
     return this.finesService.getOfficerFineHistory(officerId);
+  }
+
+  @Get('my-history')
+  async getMyFineHistory(@Req() req: AuthenticatedRequest) {
+    const userId = req.user.id;
+    return this.finesService.getDriverFineHistory(userId);
+  }
+
+  @Post('calculate-total')
+  async calculateTotal(
+    @Body() data: { fineIds: string[] },
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user.id;
+    return this.finesService.calculateTotalAmount(data.fineIds, userId);
+  }
+
+  @Post('pay')
+  async payDummyFines(
+    @Body() data: { fineIds: string[] },
+    @Req() req: AuthenticatedRequest,
+  ) {
+    const userId = req.user.id;
+    return this.finesService.payFines(data.fineIds, userId);
   }
 }
