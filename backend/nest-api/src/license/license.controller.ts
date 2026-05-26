@@ -6,14 +6,35 @@ import {
   Param,
   Patch,
   Delete,
+  UseGuards,
+  Req,
 } from '@nestjs/common';
 import { LicenseService } from './license.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { Request } from 'express';
+
+interface AuthenticatedRequest extends Request {
+  user: {
+    id: string;
+  };
+}
 
 @Controller('license')
 export class LicenseController {
   constructor(private readonly licenseService: LicenseService) {}
 
-  // POST endpoint to issue a new license automatically via DMT integration
+  @UseGuards(JwtAuthGuard)
+  @Get('my-card')
+  async getMyCard(@Req() req: AuthenticatedRequest) {
+    return this.licenseService.getVirtualCardDetails(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('scan/:token')
+  async scanLicense(@Param('token') token: string) {
+    return this.licenseService.getLicenseByQrToken(token);
+  }
+
   @Post('issue')
   async issueLicense(
     @Body()
@@ -25,13 +46,11 @@ export class LicenseController {
     return this.licenseService.issueLicense(licenseData);
   }
 
-  // GET endpoint to fetch license details
   @Get(':id')
   async getLicense(@Param('id') id: string) {
     return this.licenseService.getLicenseById(id);
   }
 
-  // PATCH endpoint to update license details (like violation points)
   @Patch(':id')
   async update(
     @Param('id') id: string,
@@ -40,7 +59,6 @@ export class LicenseController {
     return this.licenseService.updateLicense(id, updateData);
   }
 
-  // DELETE endpoint to revoke/remove a license
   @Delete(':id')
   async revoke(@Param('id') id: string) {
     return this.licenseService.deleteLicense(id);

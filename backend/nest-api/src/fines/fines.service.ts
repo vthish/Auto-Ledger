@@ -5,17 +5,38 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { JwtService } from '@nestjs/jwt';
 import { LicenseStatus, FineStatus } from '@prisma/client';
+
+interface QrPayload {
+  userId: string;
+  nic: string;
+  licenseNumber: string;
+}
 
 @Injectable()
 export class FinesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private jwtService: JwtService,
+  ) {}
 
   async issueFine(data: {
-    licenseNumber: string;
-    offenseCode: string;
+    qrToken: string;
+    offenseCodes: string[];
     officerId: string;
   }) {
+    let licenseNumber = '';
+
+    try {
+      const decoded: QrPayload = this.jwtService.verify(data.qrToken);
+      licenseNumber = decoded.licenseNumber;
+    } catch {
+      throw new UnauthorizedException(
+        'QR Token Expired or Invalid! Please scan the driver app again.',
+      );
+    }
+
     const officer = await this.prisma.officer.findUnique({
       where: { id: data.officerId },
       include: { shifts: { where: { isActive: true } } },
@@ -29,7 +50,6 @@ export class FinesService {
 
     if (activeShift) {
       const now = new Date();
-
       const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
       const shiftStartMinutes =
         activeShift.startTime.getHours() * 60 +
@@ -38,7 +58,6 @@ export class FinesService {
         activeShift.endTime.getHours() * 60 + activeShift.endTime.getMinutes();
 
       let isWithinShift = false;
-
       if (shiftStartMinutes <= shiftEndMinutes) {
         isWithinShift =
           currentTotalMinutes >= shiftStartMinutes &&
@@ -61,7 +80,7 @@ export class FinesService {
     }
 
     const license = await this.prisma.license.findUnique({
-      where: { licenseNumber: data.licenseNumber },
+      where: { licenseNumber },
     });
 
     if (!license) {
@@ -74,38 +93,55 @@ export class FinesService {
       );
     }
 
-    const offense = await this.prisma.offenseCategory.findUnique({
-      where: { code: data.offenseCode },
+    const offenses = await this.prisma.offenseCategory.findMany({
+      where: { code: { in: data.offenseCodes } },
     });
 
-    if (!offense) {
-      throw new NotFoundException('Invalid offense code.');
+    if (offenses.length === 0 || offenses.length !== data.offenseCodes.length) {
+      throw new NotFoundException('One or more offense codes are invalid.');
     }
 
-    const newPoints = license.points + offense.points;
+    const totalOffensePoints = offenses.reduce(
+      (sum, off) => sum + off.points,
+      0,
+    );
+    const newPoints = license.points + totalOffensePoints;
 
-    let newLicenseStatus: LicenseStatus = LicenseStatus.SUSPENDED;
-    let newFineStatus: FineStatus = FineStatus.PENDING;
+    const isCourtCase = offenses.some((off) => off.isCourtCase);
+
+    const newLicenseStatus: LicenseStatus = isCourtCase
+      ? LicenseStatus.COURT_PENDING
+      : LicenseStatus.SUSPENDED;
+
     let tempExpiryDate: Date | null = null;
-
-    if (offense.isCourtCase) {
-      newLicenseStatus = LicenseStatus.COURT_PENDING;
-      newFineStatus = FineStatus.COURT_CASE;
-    } else {
+    if (!isCourtCase) {
       tempExpiryDate = new Date();
       tempExpiryDate.setDate(tempExpiryDate.getDate() + 14);
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const newFine = await tx.fine.create({
-        data: {
-          dueDate: tempExpiryDate,
-          status: newFineStatus,
-          licenseId: license.id,
-          officerId: data.officerId,
-          offenseCategoryId: offense.id,
-        },
-      });
+      const createdFines = await Promise.all(
+        offenses.map((offense) => {
+          const fineStatus = offense.isCourtCase
+            ? FineStatus.COURT_CASE
+            : FineStatus.PENDING;
+
+          const fineDueDate = offense.isCourtCase ? null : tempExpiryDate;
+
+          return tx.fine.create({
+            data: {
+              dueDate: fineDueDate,
+              status: fineStatus,
+              licenseId: license.id,
+              officerId: data.officerId,
+              offenseCategoryId: offense.id,
+            },
+            include: {
+              offenseCategory: { select: { name: true, amount: true } },
+            },
+          });
+        }),
+      );
 
       const updatedLicense = await tx.license.update({
         where: { id: license.id },
@@ -117,7 +153,7 @@ export class FinesService {
       });
 
       return {
-        fineDetails: newFine,
+        fineDetails: createdFines,
         licenseStatus: updatedLicense.status,
         accumulatedPoints: updatedLicense.points,
         temporaryLicenseExpiry: updatedLicense.temporaryLicenseExpiry,
@@ -210,5 +246,153 @@ export class FinesService {
       },
       orderBy: { issuedAt: 'desc' },
     });
+  }
+
+  async getDriverFineHistory(userId: string) {
+    const license = await this.prisma.license.findUnique({
+      where: { userId },
+    });
+
+    if (!license) {
+      throw new NotFoundException('No driving license found for this user.');
+    }
+
+    return this.prisma.fine.findMany({
+      where: { licenseId: license.id },
+      include: {
+        offenseCategory: {
+          select: { name: true, points: true, amount: true },
+        },
+        officer: { select: { badgeNumber: true } },
+      },
+      orderBy: { issuedAt: 'desc' },
+    });
+  }
+
+  async calculateTotalAmount(fineIds: string[], userId: string) {
+    if (!fineIds || fineIds.length === 0) {
+      throw new BadRequestException('No fines selected.');
+    }
+
+    const fines = await this.prisma.fine.findMany({
+      where: { id: { in: fineIds } },
+      include: { license: true, offenseCategory: true },
+    });
+
+    if (fines.length === 0 || fines.some((f) => f.license.userId !== userId)) {
+      throw new UnauthorizedException(
+        'You do not have permission to view one or more of these fines.',
+      );
+    }
+
+    if (fines.some((f) => f.status !== FineStatus.PENDING)) {
+      throw new BadRequestException(
+        'One or more selected fines cannot be paid.',
+      );
+    }
+
+    const totalAmount = fines.reduce(
+      (sum, fine) => sum + fine.offenseCategory.amount,
+      0,
+    );
+
+    return { totalAmount };
+  }
+
+  async payFines(fineIds: string[], userId: string) {
+    if (!fineIds || fineIds.length === 0) {
+      throw new BadRequestException('No fines selected for payment.');
+    }
+
+    const fines = await this.prisma.fine.findMany({
+      where: { id: { in: fineIds } },
+      include: { license: true },
+    });
+
+    if (fines.length === 0 || fines.some((f) => f.license.userId !== userId)) {
+      throw new UnauthorizedException(
+        'You do not have permission to pay one or more of these fines.',
+      );
+    }
+
+    if (fines.some((f) => f.status !== FineStatus.PENDING)) {
+      throw new BadRequestException(
+        'One or more fines cannot be paid. They may already be paid or are court cases.',
+      );
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      await tx.fine.updateMany({
+        where: { id: { in: fineIds } },
+        data: { status: FineStatus.PAID },
+      });
+
+      const firstFine = fines[0];
+
+      const otherPendingFinesCount = await tx.fine.count({
+        where: {
+          licenseId: firstFine.licenseId,
+          status: FineStatus.PENDING,
+        },
+      });
+
+      let updatedLicenseStatus: LicenseStatus = LicenseStatus.SUSPENDED;
+
+      if (otherPendingFinesCount === 0) {
+        await tx.license.update({
+          where: { id: firstFine.licenseId },
+          data: {
+            status: LicenseStatus.ACTIVE,
+            temporaryLicenseExpiry: null,
+          },
+        });
+        updatedLicenseStatus = LicenseStatus.ACTIVE;
+      }
+
+      return {
+        success: true,
+        message: `Successfully paid ${fineIds.length} fine(s).`,
+        licenseStatus: updatedLicenseStatus,
+      };
+    });
+  }
+
+  async getDistrictStatistics(districtId: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const totalFinesToday = await this.prisma.fine.count({
+      where: {
+        officer: { districtId },
+        issuedAt: { gte: today },
+      },
+    });
+
+    const paidFines = await this.prisma.fine.findMany({
+      where: {
+        officer: { districtId },
+        status: 'PAID',
+        issuedAt: { gte: today },
+      },
+      include: { offenseCategory: true },
+    });
+
+    const revenueToday = paidFines.reduce(
+      (sum, fine) => sum + fine.offenseCategory.amount,
+      0,
+    );
+
+    const pendingCourtCases = await this.prisma.fine.count({
+      where: {
+        officer: { districtId },
+        status: 'COURT_CASE',
+      },
+    });
+
+    return {
+      totalFinesToday,
+      revenueToday,
+      pendingCourtCases,
+    };
   }
 }

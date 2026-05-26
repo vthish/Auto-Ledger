@@ -8,11 +8,14 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(uuid())
-  nic         String   @unique
-  phoneNumber String   @unique
-  name        String
-  license     License?
+  id              String   @id @default(uuid())
+  nic             String   @unique
+  phoneNumber     String   @unique
+  name            String
+  password        String
+  deviceId        String?
+  isPhoneVerified Boolean  @default(false)
+  license         License?
 }
 
 model License {
@@ -60,14 +63,13 @@ model Shift {
 }
 
 model OffenseCategory {
-  id          String  @id @default(uuid())
-  code        String  @unique
+  id          String   @id @default(uuid())
+  code        String   @unique
   name        String
-  amount      Float
   points      Int
-  isCourtCase Boolean @default(false)
-
-  fines Fine[]
+  isCourtCase Boolean  @default(false)
+  amount      Float    @default(0.0) 
+  fines       Fine[]
 }
 
 model Fine {
