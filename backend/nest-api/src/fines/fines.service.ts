@@ -28,7 +28,6 @@ export class FinesService {
   }) {
     let licenseNumber = '';
 
-    // Verify driver QR token
     try {
       const decoded: QrPayload = this.jwtService.verify(data.qrToken);
       licenseNumber = decoded.licenseNumber;
@@ -38,7 +37,6 @@ export class FinesService {
       );
     }
 
-    // Verify officer
     const officer = await this.prisma.officer.findUnique({
       where: { id: data.officerId },
       include: { shifts: { where: { isActive: true } } },
@@ -50,7 +48,6 @@ export class FinesService {
 
     const activeShift = officer.shifts[0];
 
-    // Validate active shift hours
     if (activeShift) {
       const now = new Date();
       const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
@@ -82,7 +79,6 @@ export class FinesService {
       );
     }
 
-    // Validate license
     const license = await this.prisma.license.findUnique({
       where: { licenseNumber },
     });
@@ -97,7 +93,6 @@ export class FinesService {
       );
     }
 
-    // Fetch offenses
     const offenses = await this.prisma.offenseCategory.findMany({
       where: { code: { in: data.offenseCodes } },
     });
@@ -112,7 +107,6 @@ export class FinesService {
     );
     const newPoints = license.points + totalOffensePoints;
 
-    // Check for court cases
     const isCourtCase = offenses.some((off) => off.isCourtCase);
 
     const newLicenseStatus: LicenseStatus = isCourtCase
@@ -126,7 +120,6 @@ export class FinesService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      // Create fines
       const createdFines = await Promise.all(
         offenses.map((offense) => {
           const fineStatus = offense.isCourtCase
@@ -150,7 +143,6 @@ export class FinesService {
         }),
       );
 
-      // Update license status
       const updatedLicense = await tx.license.update({
         where: { id: license.id },
         data: {
@@ -277,7 +269,6 @@ export class FinesService {
     });
   }
 
-  // Calculate total amount for selected fines
   async calculateTotalAmount(fineIds: string[], userId: string) {
     if (!fineIds || fineIds.length === 0) {
       throw new BadRequestException('No fines selected.');
@@ -308,7 +299,6 @@ export class FinesService {
     return { totalAmount };
   }
 
-  // Process multiple fine payments
   async payFines(fineIds: string[], userId: string) {
     if (!fineIds || fineIds.length === 0) {
       throw new BadRequestException('No fines selected for payment.');
@@ -332,7 +322,6 @@ export class FinesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      // Update paid fines
       await tx.fine.updateMany({
         where: { id: { in: fineIds } },
         data: { status: FineStatus.PAID },
@@ -340,7 +329,6 @@ export class FinesService {
 
       const firstFine = fines[0];
 
-      // Check remaining pending fines
       const otherPendingFinesCount = await tx.fine.count({
         where: {
           licenseId: firstFine.licenseId,
@@ -350,7 +338,6 @@ export class FinesService {
 
       let updatedLicenseStatus: LicenseStatus = LicenseStatus.SUSPENDED;
 
-      // Revert license status to ACTIVE if no pending fines
       if (otherPendingFinesCount === 0) {
         await tx.license.update({
           where: { id: firstFine.licenseId },
@@ -368,5 +355,44 @@ export class FinesService {
         licenseStatus: updatedLicenseStatus,
       };
     });
+  }
+
+  async getDistrictStatistics(districtId: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const totalFinesToday = await this.prisma.fine.count({
+      where: {
+        officer: { districtId },
+        issuedAt: { gte: today },
+      },
+    });
+
+    const paidFines = await this.prisma.fine.findMany({
+      where: {
+        officer: { districtId },
+        status: 'PAID',
+        issuedAt: { gte: today },
+      },
+      include: { offenseCategory: true },
+    });
+
+    const revenueToday = paidFines.reduce(
+      (sum, fine) => sum + fine.offenseCategory.amount,
+      0,
+    );
+
+    const pendingCourtCases = await this.prisma.fine.count({
+      where: {
+        officer: { districtId },
+        status: 'COURT_CASE',
+      },
+    });
+
+    return {
+      totalFinesToday,
+      revenueToday,
+      pendingCourtCases,
+    };
   }
 }

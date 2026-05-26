@@ -39,7 +39,6 @@ export class FinesController {
     return this.finesService.issueFine(fineData);
   }
 
-  // Update Court Case Verdict (Restricted to DIVISIONAL_HEAD)
   @Patch('court/:fineId/resolve')
   @UseGuards(RolesGuard)
   @Roles('DIVISIONAL_HEAD')
@@ -50,14 +49,20 @@ export class FinesController {
     return this.finesService.resolveCourtCase(fineId, data.finalVerdict);
   }
 
-  // Get Court Cases for Head's District (Restricted to DIVISIONAL_HEAD)
   @Get('district/court-cases')
   @UseGuards(RolesGuard)
   @Roles('DIVISIONAL_HEAD')
   async getDistrictCourtCases(@Req() req: AuthenticatedRequest) {
-    // Extract districtId directly from the validated token
     const districtId = req.user.districtId;
     return this.finesService.getCourtCasesByDistrict(districtId);
+  }
+
+  @Get('district/statistics')
+  @UseGuards(RolesGuard)
+  @Roles('DIVISIONAL_HEAD')
+  async getDistrictStatistics(@Req() req: AuthenticatedRequest) {
+    const districtId = req.user.districtId;
+    return this.finesService.getDistrictStatistics(districtId);
   }
 
   @Get('offenses')
