@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/app_error_handler.dart';
+import 'add_traffic_officer_screen.dart';
 
 class DoDashboardScreen extends StatelessWidget {
   const DoDashboardScreen({super.key});
@@ -11,6 +12,14 @@ class DoDashboardScreen extends StatelessWidget {
       context,
       message: '$featureName will be connected next.',
       isError: false,
+    );
+  }
+
+  void _openScreen(BuildContext context, Widget screen) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => screen,
+      ),
     );
   }
 
@@ -50,9 +59,9 @@ class DoDashboardScreen extends StatelessWidget {
                       icon: Icons.person_add_alt_1_outlined,
                       title: 'Add Traffic Officer',
                       subtitle: 'Create a new traffic officer account.',
-                      onTap: () => _showPendingMessage(
+                      onTap: () => _openScreen(
                         context,
-                        'Add Traffic Officer',
+                        const AddTrafficOfficerScreen(),
                       ),
                     ),
                     const SizedBox(height: 14),
