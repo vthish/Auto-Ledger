@@ -9,7 +9,20 @@ import {
 } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiProperty,
+} from '@nestjs/swagger';
+
+export class UpdateUserDto {
+  @ApiProperty({ example: 'K.V.V. Thishan', required: false })
+  name?: string;
+
+  @ApiProperty({ example: '0771234567', required: false })
+  phoneNumber?: string;
+}
 
 @ApiTags('Users')
 @ApiBearerAuth()
@@ -26,10 +39,7 @@ export class UsersController {
 
   @ApiOperation({ summary: 'Update user details' })
   @Patch(':id')
-  async updateUser(
-    @Param('id') id: string,
-    @Body() data: { name?: string; phoneNumber?: string },
-  ) {
+  async updateUser(@Param('id') id: string, @Body() data: UpdateUserDto) {
     return this.usersService.updateUser(id, data);
   }
 

@@ -4,7 +4,51 @@ import { OfficersService } from './officers.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiProperty,
+} from '@nestjs/swagger';
+
+export class RegisterHeadDto {
+  @ApiProperty({ example: 'HEAD-GALLE-01' })
+  badgeNumber: string;
+
+  @ApiProperty({ example: 'Kamal Perera' })
+  name: string;
+
+  @ApiProperty({ example: 'headpassword123' })
+  password: string;
+
+  @ApiProperty({ example: 'Galle' })
+  districtName: string;
+}
+
+export class RegisterOfficerDto {
+  @ApiProperty({ example: 'TRF-GALLE-100' })
+  badgeNumber: string;
+
+  @ApiProperty({ example: 'Nimal Silva' })
+  name: string;
+
+  @ApiProperty({ example: 'officerpassword123' })
+  password: string;
+
+  @ApiProperty({ example: 'TRAFFIC_OFFICER', required: false })
+  role?: string;
+}
+
+export class AssignShiftDto {
+  @ApiProperty({ example: 'officer-uuid-here' })
+  officerId: string;
+
+  @ApiProperty({ example: '2026-05-28T08:00:00Z' })
+  startTime: string;
+
+  @ApiProperty({ example: '2026-05-28T16:00:00Z' })
+  endTime: string;
+}
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -21,15 +65,7 @@ export class OfficersController {
 
   @ApiOperation({ summary: 'Register a Divisional Head' })
   @Post('register/head')
-  async registerDivisionalHead(
-    @Body()
-    data: {
-      badgeNumber: string;
-      name: string;
-      password: string;
-      districtName: string;
-    },
-  ) {
+  async registerDivisionalHead(@Body() data: RegisterHeadDto) {
     return this.officersService.registerDivisionalHead(data);
   }
 
@@ -40,13 +76,7 @@ export class OfficersController {
   @Roles('DIVISIONAL_HEAD')
   async registerOfficer(
     @Req() req: AuthenticatedRequest,
-    @Body()
-    officerData: {
-      badgeNumber: string;
-      name: string;
-      password: string;
-      role?: string;
-    },
+    @Body() officerData: RegisterOfficerDto,
   ) {
     const districtId = req.user.districtId;
     return this.officersService.registerOfficer({ ...officerData, districtId });
@@ -57,14 +87,7 @@ export class OfficersController {
   @Post('shift')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DIVISIONAL_HEAD')
-  async assignShift(
-    @Body()
-    data: {
-      officerId: string;
-      startTime: string;
-      endTime: string;
-    },
-  ) {
+  async assignShift(@Body() data: AssignShiftDto) {
     return this.officersService.assignShift(data);
   }
 

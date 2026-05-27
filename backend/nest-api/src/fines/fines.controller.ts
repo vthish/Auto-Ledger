@@ -13,7 +13,33 @@ import { FinesService } from './fines.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiProperty,
+} from '@nestjs/swagger';
+
+export class IssueFineDto {
+  @ApiProperty({ example: 'qr-token-string-here' })
+  qrToken: string;
+
+  @ApiProperty({ example: ['01', '02'] })
+  offenseCodes: string[];
+
+  @ApiProperty({ example: 'TRF-GALLE-100' })
+  officerId: string;
+}
+
+export class ResolveCourtCaseDto {
+  @ApiProperty({ example: 'ACTIVE', enum: ['ACTIVE', 'REVOKED'] })
+  finalVerdict: 'ACTIVE' | 'REVOKED';
+}
+
+export class FineIdsDto {
+  @ApiProperty({ example: ['fine-uuid-1111', 'fine-uuid-2222'] })
+  fineIds: string[];
+}
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -32,14 +58,7 @@ export class FinesController {
 
   @ApiOperation({ summary: 'Issue a new fine' })
   @Post('issue')
-  async issueFine(
-    @Body()
-    fineData: {
-      qrToken: string;
-      offenseCodes: string[];
-      officerId: string;
-    },
-  ) {
+  async issueFine(@Body() fineData: IssueFineDto) {
     return this.finesService.issueFine(fineData);
   }
 
@@ -49,7 +68,7 @@ export class FinesController {
   @Roles('DIVISIONAL_HEAD')
   async resolveCourtCase(
     @Param('fineId') fineId: string,
-    @Body() data: { finalVerdict: 'ACTIVE' | 'REVOKED' },
+    @Body() data: ResolveCourtCaseDto,
   ) {
     return this.finesService.resolveCourtCase(fineId, data.finalVerdict);
   }
@@ -101,7 +120,7 @@ export class FinesController {
   @ApiOperation({ summary: 'Calculate total amount for selected fines' })
   @Post('calculate-total')
   async calculateTotal(
-    @Body() data: { fineIds: string[] },
+    @Body() data: FineIdsDto,
     @Req() req: AuthenticatedRequest,
   ) {
     const userId = req.user.id;
@@ -111,7 +130,7 @@ export class FinesController {
   @ApiOperation({ summary: 'Pay selected fines' })
   @Post('pay')
   async payDummyFines(
-    @Body() data: { fineIds: string[] },
+    @Body() data: FineIdsDto,
     @Req() req: AuthenticatedRequest,
   ) {
     const userId = req.user.id;

@@ -12,7 +12,28 @@ import {
 import { LicenseService } from './license.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { Request } from 'express';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiProperty,
+} from '@nestjs/swagger';
+
+export class IssueLicenseDto {
+  @ApiProperty({ example: '200204802139' })
+  nic: string;
+
+  @ApiProperty({ example: 'user-uuid-here' })
+  userId: string;
+}
+
+export class UpdateLicenseDto {
+  @ApiProperty({ example: '2027-01-01T00:00:00Z', required: false })
+  expiryDate?: string;
+
+  @ApiProperty({ example: 12, required: false })
+  points?: number;
+}
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -43,13 +64,7 @@ export class LicenseController {
 
   @ApiOperation({ summary: 'Issue a new license' })
   @Post('issue')
-  async issueLicense(
-    @Body()
-    licenseData: {
-      nic: string;
-      userId: string;
-    },
-  ) {
+  async issueLicense(@Body() licenseData: IssueLicenseDto) {
     return this.licenseService.issueLicense(licenseData);
   }
 
@@ -61,10 +76,7 @@ export class LicenseController {
 
   @ApiOperation({ summary: 'Update license details' })
   @Patch(':id')
-  async update(
-    @Param('id') id: string,
-    @Body() updateData: { expiryDate?: string; points?: number },
-  ) {
+  async update(@Param('id') id: string, @Body() updateData: UpdateLicenseDto) {
     return this.licenseService.updateLicense(id, updateData);
   }
 
