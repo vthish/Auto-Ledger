@@ -4,6 +4,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/app_error_handler.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
+import '../../divisional_officer/screens/do_dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -40,15 +41,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    Future.delayed(const Duration(seconds: 1), () {
+    Future.delayed(const Duration(milliseconds: 700), () {
       if (!mounted) return;
 
       setState(() => _isLoading = false);
 
-      AppErrorHandler.showPopup(
-        context,
-        message: 'Login UI ready. API connection will be added next.',
-        isError: false,
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (_) => const DoDashboardScreen(),
+        ),
       );
     });
   }
@@ -76,7 +77,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           SizedBox(height: isSmallScreen ? 24 : 36),
-
                           Container(
                             width: 78,
                             height: 78,
@@ -90,9 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               size: 42,
                             ),
                           ),
-
                           const SizedBox(height: 22),
-
                           const Text(
                             'Auto-Ledger',
                             textAlign: TextAlign.center,
@@ -103,9 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               letterSpacing: -0.4,
                             ),
                           ),
-
                           const SizedBox(height: 6),
-
                           const Text(
                             'Police Officer Portal',
                             textAlign: TextAlign.center,
@@ -115,9 +111,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               fontWeight: FontWeight.w600,
                             ),
                           ),
-
                           const SizedBox(height: 8),
-
                           const Text(
                             'Secure access for authorized personnel',
                             textAlign: TextAlign.center,
@@ -126,9 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               fontSize: 13,
                             ),
                           ),
-
                           SizedBox(height: isSmallScreen ? 28 : 42),
-
                           Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
@@ -154,9 +146,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     fontWeight: FontWeight.w800,
                                   ),
                                 ),
-
                                 const SizedBox(height: 6),
-
                                 const Text(
                                   'Use your badge number and password.',
                                   style: TextStyle(
@@ -164,9 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     fontSize: 13,
                                   ),
                                 ),
-
                                 const SizedBox(height: 22),
-
                                 AppTextField(
                                   controller: _badgeController,
                                   label: 'Badge Number',
@@ -181,9 +169,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     return null;
                                   },
                                 ),
-
                                 const SizedBox(height: 16),
-
                                 AppTextField(
                                   controller: _passwordController,
                                   label: 'Password',
@@ -214,9 +200,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     return null;
                                   },
                                 ),
-
                                 const SizedBox(height: 24),
-
                                 AppButton(
                                   text: 'Login',
                                   icon: Icons.login_rounded,
@@ -226,9 +210,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ],
                             ),
                           ),
-
                           const SizedBox(height: 24),
-
                           const Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -251,7 +233,6 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ],
                           ),
-
                           SizedBox(height: isSmallScreen ? 24 : 36),
                         ],
                       ),
