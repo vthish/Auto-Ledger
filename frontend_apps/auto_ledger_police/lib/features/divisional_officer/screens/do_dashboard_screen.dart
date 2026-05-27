@@ -4,6 +4,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/app_error_handler.dart';
 import 'add_traffic_officer_screen.dart';
 import 'assign_shift_screen.dart';
+import 'court_cases_screen.dart';
+import 'district_statistics_screen.dart';
 import 'traffic_officer_list_screen.dart';
 
 class DoDashboardScreen extends StatelessWidget {
@@ -91,9 +93,9 @@ class DoDashboardScreen extends StatelessWidget {
                       icon: Icons.gavel_outlined,
                       title: 'Court Cases',
                       subtitle: 'Review and resolve court pending fines.',
-                      onTap: () => _showPendingMessage(
+                      onTap: () => _openScreen(
                         context,
-                        'Court Cases',
+                        const CourtCasesScreen(),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -101,9 +103,9 @@ class DoDashboardScreen extends StatelessWidget {
                       icon: Icons.bar_chart_rounded,
                       title: 'District Statistics',
                       subtitle: 'View district level fine summary.',
-                      onTap: () => _showPendingMessage(
+                      onTap: () => _openScreen(
                         context,
-                        'District Statistics',
+                        const DistrictStatisticsScreen(),
                       ),
                     ),
                     const SizedBox(height: 28),
