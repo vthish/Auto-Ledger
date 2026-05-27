@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/app_error_handler.dart';
 import 'add_traffic_officer_screen.dart';
+import 'traffic_officer_list_screen.dart';
 
 class DoDashboardScreen extends StatelessWidget {
   const DoDashboardScreen({super.key});
@@ -69,9 +70,9 @@ class DoDashboardScreen extends StatelessWidget {
                       icon: Icons.groups_2_outlined,
                       title: 'Traffic Officer List',
                       subtitle: 'View officers assigned to your district.',
-                      onTap: () => _showPendingMessage(
+                      onTap: () => _openScreen(
                         context,
-                        'Traffic Officer List',
+                        const TrafficOfficerListScreen(),
                       ),
                     ),
                     const SizedBox(height: 14),
