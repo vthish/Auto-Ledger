@@ -4,6 +4,7 @@ import { OfficersService } from './officers.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 
 interface AuthenticatedRequest extends Request {
   user: {
@@ -13,11 +14,12 @@ interface AuthenticatedRequest extends Request {
   };
 }
 
+@ApiTags('Officers')
 @Controller('officers')
 export class OfficersController {
   constructor(private readonly officersService: OfficersService) {}
 
-  // Open endpoint to register heads (Usually done via DB seed or Super Admin)
+  @ApiOperation({ summary: 'Register a Divisional Head' })
   @Post('register/head')
   async registerDivisionalHead(
     @Body()
@@ -31,7 +33,8 @@ export class OfficersController {
     return this.officersService.registerDivisionalHead(data);
   }
 
-  // Restricted to DIVISIONAL_HEAD
+  @ApiOperation({ summary: 'Register a new Traffic Officer' })
+  @ApiBearerAuth()
   @Post('register')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DIVISIONAL_HEAD')
@@ -45,12 +48,12 @@ export class OfficersController {
       role?: string;
     },
   ) {
-    // Automatically assign the officer to the Head's district
     const districtId = req.user.districtId;
     return this.officersService.registerOfficer({ ...officerData, districtId });
   }
 
-  // Restricted to DIVISIONAL_HEAD
+  @ApiOperation({ summary: 'Assign a shift to an officer' })
+  @ApiBearerAuth()
   @Post('shift')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DIVISIONAL_HEAD')
@@ -65,7 +68,8 @@ export class OfficersController {
     return this.officersService.assignShift(data);
   }
 
-  // Restricted to DIVISIONAL_HEAD to view their own district's officers
+  @ApiOperation({ summary: 'Get all officers in the district' })
+  @ApiBearerAuth()
   @Get('my-district')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('DIVISIONAL_HEAD')
