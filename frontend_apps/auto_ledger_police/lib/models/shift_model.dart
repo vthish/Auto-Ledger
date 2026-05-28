@@ -4,12 +4,14 @@ class ShiftModel {
     required this.officerId,
     required this.startTime,
     required this.endTime,
+    required this.isActive,
   });
 
   final String id;
   final String officerId;
   final DateTime? startTime;
   final DateTime? endTime;
+  final bool isActive;
 
   factory ShiftModel.fromJson(Map<String, dynamic> json) {
     return ShiftModel(
@@ -17,15 +19,7 @@ class ShiftModel {
       officerId: json['officerId']?.toString() ?? '',
       startTime: DateTime.tryParse(json['startTime']?.toString() ?? ''),
       endTime: DateTime.tryParse(json['endTime']?.toString() ?? ''),
+      isActive: json['isActive'] == true,
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'officerId': officerId,
-      'startTime': startTime?.toIso8601String(),
-      'endTime': endTime?.toIso8601String(),
-    };
   }
 }

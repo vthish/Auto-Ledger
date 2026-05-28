@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/app_error_handler.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
+import '../services/officer_service.dart';
 
 class AddTrafficOfficerScreen extends StatefulWidget {
   const AddTrafficOfficerScreen({super.key});
@@ -19,6 +21,7 @@ class _AddTrafficOfficerScreenState extends State<AddTrafficOfficerScreen> {
   final _badgeController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _officerService = OfficerService();
 
   bool _isPasswordHidden = true;
   bool _isConfirmPasswordHidden = true;
@@ -33,7 +36,7 @@ class _AddTrafficOfficerScreenState extends State<AddTrafficOfficerScreen> {
     super.dispose();
   }
 
-  void _handleCreateOfficer() {
+  Future<void> _handleCreateOfficer() async {
     FocusScope.of(context).unfocus();
 
     if (!_formKey.currentState!.validate()) {
@@ -46,17 +49,44 @@ class _AddTrafficOfficerScreenState extends State<AddTrafficOfficerScreen> {
 
     setState(() => _isLoading = true);
 
-    Future.delayed(const Duration(milliseconds: 700), () {
+    try {
+      await _officerService.registerTrafficOfficer(
+        name: _nameController.text,
+        badgeNumber: _badgeController.text,
+        password: _passwordController.text,
+      );
+
       if (!mounted) return;
 
-      setState(() => _isLoading = false);
+      _nameController.clear();
+      _badgeController.clear();
+      _passwordController.clear();
+      _confirmPasswordController.clear();
 
       AppErrorHandler.showPopup(
         context,
-        message: 'Traffic officer form ready. API will be connected next.',
+        message: 'Traffic officer created successfully.',
         isError: false,
       );
-    });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+
+      AppErrorHandler.showPopup(
+        context,
+        message: error.message,
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      AppErrorHandler.showPopup(
+        context,
+        message: 'Unable to create traffic officer. Please try again.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override

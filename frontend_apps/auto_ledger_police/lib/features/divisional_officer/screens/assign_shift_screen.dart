@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/app_error_handler.dart';
+import '../../../models/officer_model.dart';
 import '../../../shared/widgets/app_button.dart';
+import '../services/officer_service.dart';
 
 class AssignShiftScreen extends StatefulWidget {
   const AssignShiftScreen({super.key});
@@ -12,16 +15,20 @@ class AssignShiftScreen extends StatefulWidget {
 }
 
 class _AssignShiftScreenState extends State<AssignShiftScreen> {
-  final List<_OfficerOption> _officers = const [
-    _OfficerOption(name: 'Nimal Perera', badgeNumber: 'TRF-GALLE-100'),
-    _OfficerOption(name: 'Kamal Silva', badgeNumber: 'TRF-GALLE-101'),
-    _OfficerOption(name: 'Sahan Fernando', badgeNumber: 'TRF-GALLE-102'),
-  ];
+  final _officerService = OfficerService();
 
-  _OfficerOption? _selectedOfficer;
+  late Future<List<OfficerModel>> _officersFuture;
+
+  OfficerModel? _selectedOfficer;
   DateTime? _startDateTime;
   DateTime? _endDateTime;
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _officersFuture = _officerService.getDistrictTrafficOfficers();
+  }
 
   Future<void> _selectDateTime({required bool isStart}) async {
     final now = DateTime.now();
@@ -79,7 +86,7 @@ class _AssignShiftScreenState extends State<AssignShiftScreen> {
     return '$date  $hour:$minute $period';
   }
 
-  void _handleAssignShift() {
+  Future<void> _handleAssignShift() async {
     if (_selectedOfficer == null) {
       AppErrorHandler.showPopup(
         context,
@@ -114,17 +121,55 @@ class _AssignShiftScreenState extends State<AssignShiftScreen> {
 
     setState(() => _isLoading = true);
 
-    Future.delayed(const Duration(milliseconds: 700), () {
-      if (!mounted) return;
+    try {
+      await _officerService.assignShift(
+        officerId: _selectedOfficer!.id,
+        startTime: _startDateTime!,
+        endTime: _endDateTime!,
+      );
 
-      setState(() => _isLoading = false);
+      if (!mounted) return;
 
       AppErrorHandler.showPopup(
         context,
-        message: 'Shift form ready. API will be connected next.',
+        message: 'Shift assigned successfully.',
         isError: false,
       );
+
+      setState(() {
+        _selectedOfficer = null;
+        _startDateTime = null;
+        _endDateTime = null;
+        _officersFuture = _officerService.getDistrictTrafficOfficers();
+      });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+
+      AppErrorHandler.showPopup(
+        context,
+        message: error.message,
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      AppErrorHandler.showPopup(
+        context,
+        message: 'Unable to assign shift. Please try again.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _refreshOfficers() async {
+    setState(() {
+      _officersFuture = _officerService.getDistrictTrafficOfficers();
+      _selectedOfficer = null;
     });
+
+    await _officersFuture;
   }
 
   @override
@@ -138,107 +183,144 @@ class _AssignShiftScreenState extends State<AssignShiftScreen> {
             fontWeight: FontWeight.w800,
           ),
         ),
+        actions: [
+          IconButton(
+            onPressed: _refreshOfficers,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
       ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
             final horizontalPadding = constraints.maxWidth < 380 ? 20.0 : 26.0;
 
-            return SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 18),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(22),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryBlack,
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                      child: const Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(
-                            Icons.schedule_outlined,
-                            color: Colors.white,
-                            size: 34,
-                          ),
-                          SizedBox(height: 18),
-                          Text(
-                            'Assign Duty Shift',
-                            style: TextStyle(
+            return RefreshIndicator(
+              color: AppTheme.primaryBlack,
+              onRefresh: _refreshOfficers,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 18),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(22),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryBlack,
+                          borderRadius: BorderRadius.circular(28),
+                        ),
+                        child: const Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.schedule_outlined,
                               color: Colors.white,
-                              fontSize: 23,
-                              fontWeight: FontWeight.w800,
+                              size: 34,
                             ),
-                          ),
-                          SizedBox(height: 8),
-                          Text(
-                            'Select a traffic officer and set the active duty start and end time.',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                              height: 1.45,
-                              fontWeight: FontWeight.w500,
+                            SizedBox(height: 18),
+                            Text(
+                              'Assign Duty Shift',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 23,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
-                          ),
-                        ],
+                            SizedBox(height: 8),
+                            Text(
+                              'Select a traffic officer and set the active duty start and end time.',
+                              style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 14,
+                                height: 1.45,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    Container(
-                      padding: const EdgeInsets.all(20),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(28),
-                        border: Border.all(color: AppTheme.borderGray),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 24,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(color: AppTheme.borderGray),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 24,
+                              offset: const Offset(0, 10),
+                            ),
+                          ],
+                        ),
+                        child: FutureBuilder<List<OfficerModel>>(
+                          future: _officersFuture,
+                          builder: (context, snapshot) {
+                            final isLoading = snapshot.connectionState ==
+                                ConnectionState.waiting;
+                            final officers = snapshot.data ?? <OfficerModel>[];
+
+                            if (isLoading) {
+                              return const _LoadingView();
+                            }
+
+                            if (snapshot.hasError) {
+                              return _ErrorView(
+                                message: snapshot.error is ApiException
+                                    ? (snapshot.error as ApiException).message
+                                    : 'Unable to load traffic officers.',
+                                onRetry: _refreshOfficers,
+                              );
+                            }
+
+                            if (officers.isEmpty) {
+                              return const _EmptyView();
+                            }
+
+                            return Column(
+                              children: [
+                                _OfficerDropdown(
+                                  officers: officers,
+                                  selectedOfficer: _selectedOfficer,
+                                  onChanged: (value) {
+                                    setState(() => _selectedOfficer = value);
+                                  },
+                                ),
+                                const SizedBox(height: 16),
+                                _DateTimeSelector(
+                                  title: 'Start Time',
+                                  value: _formatDateTime(_startDateTime),
+                                  icon: Icons.play_circle_outline_rounded,
+                                  onTap: () => _selectDateTime(isStart: true),
+                                ),
+                                const SizedBox(height: 16),
+                                _DateTimeSelector(
+                                  title: 'End Time',
+                                  value: _formatDateTime(_endDateTime),
+                                  icon: Icons.stop_circle_outlined,
+                                  onTap: () => _selectDateTime(isStart: false),
+                                ),
+                                const SizedBox(height: 24),
+                                AppButton(
+                                  text: 'Assign Shift',
+                                  icon: Icons.schedule_send_outlined,
+                                  isLoading: _isLoading,
+                                  onPressed: _handleAssignShift,
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                       ),
-                      child: Column(
-                        children: [
-                          _OfficerDropdown(
-                            officers: _officers,
-                            selectedOfficer: _selectedOfficer,
-                            onChanged: (value) {
-                              setState(() => _selectedOfficer = value);
-                            },
-                          ),
-                          const SizedBox(height: 16),
-                          _DateTimeSelector(
-                            title: 'Start Time',
-                            value: _formatDateTime(_startDateTime),
-                            icon: Icons.play_circle_outline_rounded,
-                            onTap: () => _selectDateTime(isStart: true),
-                          ),
-                          const SizedBox(height: 16),
-                          _DateTimeSelector(
-                            title: 'End Time',
-                            value: _formatDateTime(_endDateTime),
-                            icon: Icons.stop_circle_outlined,
-                            onTap: () => _selectDateTime(isStart: false),
-                          ),
-                          const SizedBox(height: 24),
-                          AppButton(
-                            text: 'Assign Shift',
-                            icon: Icons.schedule_send_outlined,
-                            isLoading: _isLoading,
-                            onPressed: _handleAssignShift,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 28),
-                  ],
+                      const SizedBox(height: 28),
+                    ],
+                  ),
                 ),
               ),
             );
@@ -249,16 +331,6 @@ class _AssignShiftScreenState extends State<AssignShiftScreen> {
   }
 }
 
-class _OfficerOption {
-  const _OfficerOption({
-    required this.name,
-    required this.badgeNumber,
-  });
-
-  final String name;
-  final String badgeNumber;
-}
-
 class _OfficerDropdown extends StatelessWidget {
   const _OfficerDropdown({
     required this.officers,
@@ -266,26 +338,67 @@ class _OfficerDropdown extends StatelessWidget {
     required this.onChanged,
   });
 
-  final List<_OfficerOption> officers;
-  final _OfficerOption? selectedOfficer;
-  final ValueChanged<_OfficerOption?> onChanged;
+  final List<OfficerModel> officers;
+  final OfficerModel? selectedOfficer;
+  final ValueChanged<OfficerModel?> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField<_OfficerOption>(
-      initialValue: selectedOfficer,
+    final selected = selectedOfficer == null
+        ? null
+        : officers.where((officer) => officer.id == selectedOfficer!.id).isEmpty
+        ? null
+        : officers.firstWhere((officer) => officer.id == selectedOfficer!.id);
+
+    return DropdownButtonFormField<OfficerModel>(
+      initialValue: selected,
+      isExpanded: true,
       items: officers.map((officer) {
         return DropdownMenuItem(
           value: officer,
-          child: Text('${officer.name}  •  ${officer.badgeNumber}'),
+          child: _OfficerDropdownText(officer: officer),
         );
       }).toList(),
+      selectedItemBuilder: (context) {
+        return officers.map((officer) {
+          return _OfficerDropdownText(officer: officer);
+        }).toList();
+      },
       onChanged: onChanged,
       decoration: const InputDecoration(
         labelText: 'Traffic Officer',
         hintText: 'Select officer',
         prefixIcon: Icon(Icons.local_police_outlined),
       ),
+    );
+  }
+}
+
+class _OfficerDropdownText extends StatelessWidget {
+  const _OfficerDropdownText({required this.officer});
+
+  final OfficerModel officer;
+
+  @override
+  Widget build(BuildContext context) {
+    final name = officer.name.isEmpty ? 'Unnamed Officer' : officer.name;
+    final badgeNumber = officer.badgeNumber.isEmpty ? 'No badge' : officer.badgeNumber;
+
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            '$name - $badgeNumber',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppTheme.primaryBlack,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -341,6 +454,8 @@ class _DateTimeSelector extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       value,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: AppTheme.textGray,
                         fontSize: 13,
@@ -359,6 +474,110 @@ class _DateTimeSelector extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _LoadingView extends StatelessWidget {
+  const _LoadingView();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox(
+      height: 120,
+      child: Center(
+        child: CircularProgressIndicator(
+          color: AppTheme.primaryBlack,
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  const _ErrorView({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const Icon(
+          Icons.error_outline,
+          color: AppTheme.errorRed,
+          size: 32,
+        ),
+        const SizedBox(height: 10),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: AppTheme.errorRed,
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 14),
+        OutlinedButton.icon(
+          onPressed: onRetry,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppTheme.errorRed,
+            side: const BorderSide(color: AppTheme.errorRed),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(25),
+            ),
+          ),
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text(
+            'Retry',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyView extends StatelessWidget {
+  const _EmptyView();
+
+  @override
+  Widget build(BuildContext context) {
+    return const Column(
+      children: [
+        Icon(
+          Icons.person_off_outlined,
+          color: AppTheme.primaryBlack,
+          size: 34,
+        ),
+        SizedBox(height: 12),
+        Text(
+          'No traffic officers found',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppTheme.primaryBlack,
+            fontSize: 16,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        SizedBox(height: 6),
+        Text(
+          'Create a traffic officer account first.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppTheme.textGray,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
     );
   }
 }

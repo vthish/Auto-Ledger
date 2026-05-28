@@ -5,7 +5,7 @@ class OfficerModel {
     required this.badgeNumber,
     required this.role,
     required this.districtId,
-    this.shift,
+    required this.shifts,
   });
 
   final String id;
@@ -13,34 +13,31 @@ class OfficerModel {
   final String badgeNumber;
   final String role;
   final String districtId;
-  final ShiftInfoModel? shift;
+  final List<ShiftInfoModel> shifts;
+
+  ShiftInfoModel? get activeShift {
+    if (shifts.isEmpty) return null;
+    return shifts.first;
+  }
+
+  bool get hasActiveShift => activeShift != null;
 
   factory OfficerModel.fromJson(Map<String, dynamic> json) {
+    final rawShifts = json['shifts'];
+
     return OfficerModel(
       id: _readString(json, 'id'),
       name: _readString(json, 'name'),
       badgeNumber: _readString(json, 'badgeNumber'),
       role: _readString(json, 'role'),
       districtId: _readString(json, 'districtId'),
-      shift: json['shift'] is Map<String, dynamic>
-          ? ShiftInfoModel.fromJson(json['shift'] as Map<String, dynamic>)
-          : json['activeShift'] is Map<String, dynamic>
-          ? ShiftInfoModel.fromJson(
-        json['activeShift'] as Map<String, dynamic>,
-      )
-          : null,
+      shifts: rawShifts is List
+          ? rawShifts
+          .whereType<Map<String, dynamic>>()
+          .map(ShiftInfoModel.fromJson)
+          .toList()
+          : <ShiftInfoModel>[],
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'name': name,
-      'badgeNumber': badgeNumber,
-      'role': role,
-      'districtId': districtId,
-      'shift': shift?.toJson(),
-    };
   }
 
   static String _readString(Map<String, dynamic> json, String key) {
@@ -71,13 +68,5 @@ class ShiftInfoModel {
       startTime: DateTime.tryParse(json['startTime']?.toString() ?? ''),
       endTime: DateTime.tryParse(json['endTime']?.toString() ?? ''),
     );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'startTime': startTime?.toIso8601String(),
-      'endTime': endTime?.toIso8601String(),
-    };
   }
 }
