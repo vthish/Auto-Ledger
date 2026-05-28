@@ -18,6 +18,13 @@ Developed as the Final Year Project for HND in Software Engineering.
 - `/backend/nest-api` - Main Backend API
 - `docker-compose.yml` - Local database & caching infrastructure
 
+## 🚀 Live Deployment
+
+![Hosted on Render](https://img.shields.io/badge/Hosted_on-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)
+
+* **Main API Base URL:** [https://auto-ledger-api.onrender.com](https://auto-ledger-api.onrender.com)
+* **Mock DMT API:** [https://auto-ledger-mock-dmt.onrender.com](https://auto-ledger-mock-dmt.onrender.com)
+
 ## 🤝 Development Team
 
 - K.V.V. Thishan
