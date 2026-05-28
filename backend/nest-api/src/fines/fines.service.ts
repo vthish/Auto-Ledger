@@ -120,28 +120,25 @@ export class FinesService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      const createdFines = await Promise.all(
-        offenses.map((offense) => {
-          const fineStatus = offense.isCourtCase
-            ? FineStatus.COURT_CASE
-            : FineStatus.PENDING;
+      const fineStatus = isCourtCase
+        ? FineStatus.COURT_CASE
+        : FineStatus.PENDING;
+      const fineDueDate = isCourtCase ? null : tempExpiryDate;
 
-          const fineDueDate = offense.isCourtCase ? null : tempExpiryDate;
-
-          return tx.fine.create({
-            data: {
-              dueDate: fineDueDate,
-              status: fineStatus,
-              licenseId: license.id,
-              officerId: data.officerId,
-              offenseCategoryId: offense.id,
-            },
-            include: {
-              offenseCategory: { select: { name: true, amount: true } },
-            },
-          });
-        }),
-      );
+      const createdFine = await tx.fine.create({
+        data: {
+          dueDate: fineDueDate,
+          status: fineStatus,
+          licenseId: license.id,
+          officerId: data.officerId,
+          offenses: {
+            connect: offenses.map((off) => ({ id: off.id })),
+          },
+        },
+        include: {
+          offenses: { select: { name: true, amount: true } },
+        },
+      });
 
       const updatedLicense = await tx.license.update({
         where: { id: license.id },
@@ -153,7 +150,7 @@ export class FinesService {
       });
 
       return {
-        fineDetails: createdFines,
+        fineDetails: [createdFine],
         licenseStatus: updatedLicense.status,
         accumulatedPoints: updatedLicense.points,
         temporaryLicenseExpiry: updatedLicense.temporaryLicenseExpiry,
@@ -201,7 +198,7 @@ export class FinesService {
       },
       include: {
         officer: { select: { badgeNumber: true, name: true } },
-        offenseCategory: true,
+        offenses: true,
         license: { select: { licenseNumber: true } },
       },
       orderBy: { issuedAt: 'desc' },
@@ -219,7 +216,7 @@ export class FinesService {
         fines: {
           orderBy: { issuedAt: 'desc' },
           take: 3,
-          include: { offenseCategory: true },
+          include: { offenses: true },
         },
       },
     });
@@ -242,7 +239,7 @@ export class FinesService {
       },
       include: {
         license: { select: { licenseNumber: true } },
-        offenseCategory: { select: { name: true, points: true } },
+        offenses: { select: { name: true, points: true } },
       },
       orderBy: { issuedAt: 'desc' },
     });
@@ -260,7 +257,7 @@ export class FinesService {
     return this.prisma.fine.findMany({
       where: { licenseId: license.id },
       include: {
-        offenseCategory: {
+        offenses: {
           select: { name: true, points: true, amount: true },
         },
         officer: { select: { badgeNumber: true } },
@@ -276,7 +273,7 @@ export class FinesService {
 
     const fines = await this.prisma.fine.findMany({
       where: { id: { in: fineIds } },
-      include: { license: true, offenseCategory: true },
+      include: { license: true, offenses: true },
     });
 
     if (fines.length === 0 || fines.some((f) => f.license.userId !== userId)) {
@@ -292,7 +289,8 @@ export class FinesService {
     }
 
     const totalAmount = fines.reduce(
-      (sum, fine) => sum + fine.offenseCategory.amount,
+      (sum, fine) =>
+        sum + fine.offenses.reduce((offSum, off) => offSum + off.amount, 0),
       0,
     );
 
@@ -374,11 +372,12 @@ export class FinesService {
         status: 'PAID',
         issuedAt: { gte: today },
       },
-      include: { offenseCategory: true },
+      include: { offenses: true },
     });
 
     const revenueToday = paidFines.reduce(
-      (sum, fine) => sum + fine.offenseCategory.amount,
+      (sum, fine) =>
+        sum + fine.offenses.reduce((offSum, off) => offSum + off.amount, 0),
       0,
     );
 
