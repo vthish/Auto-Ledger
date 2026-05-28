@@ -1,57 +1,47 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../models/fine_model.dart';
+import '../services/fine_service.dart';
 
-class DistrictStatisticsScreen extends StatelessWidget {
+class DistrictStatisticsScreen extends StatefulWidget {
   const DistrictStatisticsScreen({super.key});
 
   @override
+  State<DistrictStatisticsScreen> createState() =>
+      _DistrictStatisticsScreenState();
+}
+
+class _DistrictStatisticsScreenState extends State<DistrictStatisticsScreen> {
+  final _fineService = FineService();
+
+  late Future<DistrictStatisticsModel> _statisticsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _statisticsFuture = _loadStatistics();
+  }
+
+  Future<DistrictStatisticsModel> _loadStatistics() {
+    return _fineService.getDistrictStatistics();
+  }
+
+  Future<void> _refreshStatistics() async {
+    setState(() {
+      _statisticsFuture = _loadStatistics();
+    });
+
+    await _statisticsFuture;
+  }
+
+  String _formatRevenue(double value) {
+    return 'LKR ${value.toStringAsFixed(2)}';
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final statistics = [
-      const _StatisticCardData(
-        title: 'Total Fines',
-        value: '128',
-        subtitle: 'Issued in district',
-        icon: Icons.receipt_long_outlined,
-      ),
-      const _StatisticCardData(
-        title: 'Court Cases',
-        value: '12',
-        subtitle: 'Pending review',
-        icon: Icons.gavel_outlined,
-      ),
-      const _StatisticCardData(
-        title: 'Active Officers',
-        value: '08',
-        subtitle: 'Currently assigned',
-        icon: Icons.local_police_outlined,
-      ),
-      const _StatisticCardData(
-        title: 'Total Points',
-        value: '342',
-        subtitle: 'Demerit points issued',
-        icon: Icons.scoreboard_outlined,
-      ),
-    ];
-
-    final recentSummary = [
-      const _SummaryRowData(
-        title: 'Speeding violations',
-        value: '46',
-        icon: Icons.speed_outlined,
-      ),
-      const _SummaryRowData(
-        title: 'Reckless driving',
-        value: '31',
-        icon: Icons.warning_amber_rounded,
-      ),
-      const _SummaryRowData(
-        title: 'DUI / Court offenses',
-        value: '12',
-        icon: Icons.balance_outlined,
-      ),
-    ];
-
     return Scaffold(
       backgroundColor: AppTheme.backgroundWhite,
       appBar: AppBar(
@@ -61,122 +51,113 @@ class DistrictStatisticsScreen extends StatelessWidget {
             fontWeight: FontWeight.w800,
           ),
         ),
+        actions: [
+          IconButton(
+            onPressed: _refreshStatistics,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
       ),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
             final horizontalPadding = constraints.maxWidth < 380 ? 20.0 : 26.0;
 
-            return SingleChildScrollView(
-              padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: 18),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(22),
-                      decoration: BoxDecoration(
-                        color: AppTheme.primaryBlack,
-                        borderRadius: BorderRadius.circular(28),
-                      ),
-                      child: const Column(
+            return RefreshIndicator(
+              color: AppTheme.primaryBlack,
+              onRefresh: _refreshStatistics,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: FutureBuilder<DistrictStatisticsModel>(
+                    future: _statisticsFuture,
+                    builder: (context, snapshot) {
+                      final isLoading =
+                          snapshot.connectionState == ConnectionState.waiting;
+
+                      if (isLoading) {
+                        return const Column(
+                          children: [
+                            SizedBox(height: 18),
+                            _HeaderCard(),
+                            SizedBox(height: 24),
+                            _LoadingCard(),
+                          ],
+                        );
+                      }
+
+                      if (snapshot.hasError) {
+                        return Column(
+                          children: [
+                            const SizedBox(height: 18),
+                            const _HeaderCard(),
+                            const SizedBox(height: 24),
+                            _ErrorCard(
+                              onRetry: _refreshStatistics,
+                              message: snapshot.error is ApiException
+                                  ? (snapshot.error as ApiException).message
+                                  : 'Unable to load district statistics.',
+                            ),
+                          ],
+                        );
+                      }
+
+                      final statistics = snapshot.data ??
+                          const DistrictStatisticsModel(
+                            totalFinesToday: 0,
+                            revenueToday: 0,
+                            pendingCourtCases: 0,
+                          );
+
+                      final cards = [
+                        _StatisticCardData(
+                          title: 'Fines Today',
+                          value: '${statistics.totalFinesToday}',
+                          subtitle: 'Issued today',
+                          icon: Icons.receipt_long_outlined,
+                        ),
+                        _StatisticCardData(
+                          title: 'Revenue Today',
+                          value: _formatRevenue(statistics.revenueToday),
+                          subtitle: 'Paid fine revenue',
+                          icon: Icons.payments_outlined,
+                        ),
+                        _StatisticCardData(
+                          title: 'Court Cases',
+                          value: '${statistics.pendingCourtCases}',
+                          subtitle: 'Pending review',
+                          icon: Icons.gavel_outlined,
+                        ),
+                      ];
+
+                      return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.bar_chart_rounded,
-                            color: Colors.white,
-                            size: 34,
-                          ),
-                          SizedBox(height: 18),
-                          Text(
-                            'District Overview',
+                          const SizedBox(height: 18),
+                          const _HeaderCard(),
+                          const SizedBox(height: 24),
+                          const Text(
+                            'Key Statistics',
                             style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 23,
+                              color: AppTheme.primaryBlack,
+                              fontSize: 18,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          SizedBox(height: 8),
-                          Text(
-                            'View fine activity, officer status, court cases, and violation summary for your district.',
-                            style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 14,
-                              height: 1.45,
-                              fontWeight: FontWeight.w500,
+                          const SizedBox(height: 14),
+                          ...cards.map(
+                                (card) => Padding(
+                              padding: const EdgeInsets.only(bottom: 14),
+                              child: _StatisticCard(data: card),
                             ),
                           ),
+                          const SizedBox(height: 28),
                         ],
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Key Statistics',
-                      style: TextStyle(
-                        color: AppTheme.primaryBlack,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    GridView.builder(
-                      itemCount: statistics.length,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: constraints.maxWidth < 390 ? 1 : 2,
-                        crossAxisSpacing: 14,
-                        mainAxisSpacing: 14,
-                        childAspectRatio: constraints.maxWidth < 390 ? 2.45 : 1.25,
-                      ),
-                      itemBuilder: (context, index) {
-                        return _StatisticCard(data: statistics[index]);
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Violation Summary',
-                      style: TextStyle(
-                        color: AppTheme.primaryBlack,
-                        fontSize: 18,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(25),
-                        border: Border.all(color: AppTheme.borderGray),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.04),
-                            blurRadius: 18,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: recentSummary
-                            .map(
-                              (item) => Padding(
-                            padding: EdgeInsets.only(
-                              bottom: item == recentSummary.last ? 0 : 14,
-                            ),
-                            child: _SummaryRow(data: item),
-                          ),
-                        )
-                            .toList(),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    const _BackendNoticeCard(),
-                    const SizedBox(height: 28),
-                  ],
+                      );
+                    },
+                  ),
                 ),
               ),
             );
@@ -201,16 +182,49 @@ class _StatisticCardData {
   final IconData icon;
 }
 
-class _SummaryRowData {
-  const _SummaryRowData({
-    required this.title,
-    required this.value,
-    required this.icon,
-  });
+class _HeaderCard extends StatelessWidget {
+  const _HeaderCard();
 
-  final String title;
-  final String value;
-  final IconData icon;
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: AppTheme.primaryBlack,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.bar_chart_rounded,
+            color: Colors.white,
+            size: 34,
+          ),
+          SizedBox(height: 18),
+          Text(
+            'District Overview',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 23,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'View today fine activity, paid revenue, and court pending cases for your district.',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+              height: 1.45,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _StatisticCard extends StatelessWidget {
@@ -221,6 +235,7 @@ class _StatisticCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
+      width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -237,8 +252,8 @@ class _StatisticCard extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 50,
-            height: 50,
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
               color: AppTheme.lightGray,
               borderRadius: BorderRadius.circular(18),
@@ -252,14 +267,15 @@ class _StatisticCard extends StatelessWidget {
           const SizedBox(width: 14),
           Expanded(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   data.value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: AppTheme.primaryBlack,
-                    fontSize: 24,
+                    fontSize: 22,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.4,
                   ),
@@ -267,15 +283,19 @@ class _StatisticCard extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   data.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: AppTheme.primaryBlack,
-                    fontSize: 13,
+                    fontSize: 14,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   data.subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: AppTheme.textGray,
                     fontSize: 12,
@@ -291,61 +311,36 @@ class _StatisticCard extends StatelessWidget {
   }
 }
 
-class _SummaryRow extends StatelessWidget {
-  const _SummaryRow({required this.data});
-
-  final _SummaryRowData data;
+class _LoadingCard extends StatelessWidget {
+  const _LoadingCard();
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          height: 44,
-          width: 44,
-          decoration: BoxDecoration(
-            color: AppTheme.lightGray,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Icon(
-            data.icon,
-            color: AppTheme.primaryBlack,
-            size: 23,
-          ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(25),
+        border: Border.all(color: AppTheme.borderGray),
+      ),
+      child: const Center(
+        child: CircularProgressIndicator(
+          color: AppTheme.primaryBlack,
         ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Text(
-            data.title,
-            style: const TextStyle(
-              color: AppTheme.primaryBlack,
-              fontSize: 14,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          decoration: BoxDecoration(
-            color: AppTheme.primaryBlack,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Text(
-            data.value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
 
-class _BackendNoticeCard extends StatelessWidget {
-  const _BackendNoticeCard();
+class _ErrorCard extends StatelessWidget {
+  const _ErrorCard({
+    required this.onRetry,
+    required this.message,
+  });
+
+  final VoidCallback onRetry;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
@@ -353,27 +348,42 @@ class _BackendNoticeCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppTheme.lightGray,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(25),
-        border: Border.all(color: AppTheme.borderGray),
+        border: Border.all(color: AppTheme.errorRed),
       ),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
         children: [
-          Icon(
-            Icons.info_outline_rounded,
-            color: AppTheme.primaryBlack,
-            size: 23,
+          const Icon(
+            Icons.error_outline,
+            color: AppTheme.errorRed,
+            size: 32,
           ),
-          SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              'These values are sample UI data. Real district statistics will load from the backend API in the next integration phase.',
+          const SizedBox(height: 10),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: AppTheme.errorRed,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            onPressed: onRetry,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.errorRed,
+              side: const BorderSide(color: AppTheme.errorRed),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(25),
+              ),
+            ),
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text(
+              'Retry',
               style: TextStyle(
-                color: AppTheme.textGray,
-                fontSize: 13,
-                height: 1.4,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),

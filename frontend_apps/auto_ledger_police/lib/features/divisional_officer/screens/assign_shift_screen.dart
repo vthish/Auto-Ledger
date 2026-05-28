@@ -8,7 +8,12 @@ import '../../../shared/widgets/app_button.dart';
 import '../services/officer_service.dart';
 
 class AssignShiftScreen extends StatefulWidget {
-  const AssignShiftScreen({super.key});
+  const AssignShiftScreen({
+    super.key,
+    this.initialOfficer,
+  });
+
+  final OfficerModel? initialOfficer;
 
   @override
   State<AssignShiftScreen> createState() => _AssignShiftScreenState();
@@ -27,7 +32,23 @@ class _AssignShiftScreenState extends State<AssignShiftScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedOfficer = widget.initialOfficer;
+    _fillShiftTimes(widget.initialOfficer);
     _officersFuture = _officerService.getDistrictTrafficOfficers();
+  }
+
+  void _fillShiftTimes(OfficerModel? officer) {
+    final shift = officer?.activeShift;
+
+    _startDateTime = shift?.startTime;
+    _endDateTime = shift?.endTime;
+  }
+
+  void _handleOfficerChanged(OfficerModel? officer) {
+    setState(() {
+      _selectedOfficer = officer;
+      _fillShiftTimes(officer);
+    });
   }
 
   Future<void> _selectDateTime({required bool isStart}) async {
@@ -137,9 +158,6 @@ class _AssignShiftScreenState extends State<AssignShiftScreen> {
       );
 
       setState(() {
-        _selectedOfficer = null;
-        _startDateTime = null;
-        _endDateTime = null;
         _officersFuture = _officerService.getDistrictTrafficOfficers();
       });
     } on ApiException catch (error) {
@@ -166,10 +184,27 @@ class _AssignShiftScreenState extends State<AssignShiftScreen> {
   Future<void> _refreshOfficers() async {
     setState(() {
       _officersFuture = _officerService.getDistrictTrafficOfficers();
-      _selectedOfficer = null;
+      _selectedOfficer = widget.initialOfficer;
+      _fillShiftTimes(widget.initialOfficer);
     });
 
     await _officersFuture;
+  }
+
+  OfficerModel? _resolveSelectedOfficer(List<OfficerModel> officers) {
+    final selected = _selectedOfficer;
+
+    if (selected == null) {
+      return null;
+    }
+
+    for (final officer in officers) {
+      if (officer.id == selected.id) {
+        return officer;
+      }
+    }
+
+    return selected;
   }
 
   @override
@@ -265,6 +300,7 @@ class _AssignShiftScreenState extends State<AssignShiftScreen> {
                             final isLoading = snapshot.connectionState ==
                                 ConnectionState.waiting;
                             final officers = snapshot.data ?? <OfficerModel>[];
+                            final selected = _resolveSelectedOfficer(officers);
 
                             if (isLoading) {
                               return const _LoadingView();
@@ -287,12 +323,14 @@ class _AssignShiftScreenState extends State<AssignShiftScreen> {
                               children: [
                                 _OfficerDropdown(
                                   officers: officers,
-                                  selectedOfficer: _selectedOfficer,
-                                  onChanged: (value) {
-                                    setState(() => _selectedOfficer = value);
-                                  },
+                                  selectedOfficer: selected,
+                                  onChanged: _handleOfficerChanged,
                                 ),
                                 const SizedBox(height: 16),
+                                if (selected?.hasActiveShift == true)
+                                  _ExistingShiftNotice(officer: selected!),
+                                if (selected?.hasActiveShift == true)
+                                  const SizedBox(height: 16),
                                 _DateTimeSelector(
                                   title: 'Start Time',
                                   value: _formatDateTime(_startDateTime),
@@ -382,7 +420,8 @@ class _OfficerDropdownText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final name = officer.name.isEmpty ? 'Unnamed Officer' : officer.name;
-    final badgeNumber = officer.badgeNumber.isEmpty ? 'No badge' : officer.badgeNumber;
+    final badgeNumber =
+    officer.badgeNumber.isEmpty ? 'No badge' : officer.badgeNumber;
 
     return Row(
       children: [
@@ -399,6 +438,50 @@ class _OfficerDropdownText extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ExistingShiftNotice extends StatelessWidget {
+  const _ExistingShiftNotice({required this.officer});
+
+  final OfficerModel officer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.lightGray,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.borderGray),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            officer.isOnDutyNow
+                ? Icons.play_circle_outline_rounded
+                : Icons.schedule_rounded,
+            color: AppTheme.primaryBlack,
+            size: 22,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '${officer.shiftStatusLabel}: existing shift values loaded.',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: AppTheme.textGray,
+                fontSize: 13,
+                height: 1.35,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

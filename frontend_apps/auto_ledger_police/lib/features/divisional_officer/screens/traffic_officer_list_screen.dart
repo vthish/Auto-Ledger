@@ -37,12 +37,16 @@ class _TrafficOfficerListScreenState extends State<TrafficOfficerListScreen> {
     await _officersFuture;
   }
 
-  void _openAssignShift() {
-    Navigator.of(context).push(
+  Future<void> _openAssignShift(OfficerModel officer) async {
+    await Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => const AssignShiftScreen(),
+        builder: (_) => AssignShiftScreen(initialOfficer: officer),
       ),
     );
+
+    if (!mounted) return;
+
+    _refreshOfficers();
   }
 
   String _formatShiftTime(OfficerModel officer) {
@@ -199,7 +203,7 @@ class _TrafficOfficerListScreenState extends State<TrafficOfficerListScreen> {
                                   child: _OfficerListCard(
                                     officer: officer,
                                     shiftTime: _formatShiftTime(officer),
-                                    onAssignShift: _openAssignShift,
+                                    onAssignShift: () => _openAssignShift(officer),
                                   ),
                                 ),
                               ),
@@ -229,9 +233,29 @@ class _OfficerListCard extends StatelessWidget {
   final String shiftTime;
   final VoidCallback onAssignShift;
 
+  Color get _statusColor {
+    if (officer.isOnDutyNow) {
+      return AppTheme.successGreen;
+    }
+
+    if (officer.hasActiveShift) {
+      return AppTheme.primaryBlack;
+    }
+
+    return AppTheme.textGray;
+  }
+
+  Color get _statusBackground {
+    if (officer.isOnDutyNow) {
+      return AppTheme.successGreen.withValues(alpha: 0.10);
+    }
+
+    return AppTheme.lightGray;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isActive = officer.hasActiveShift;
+    final statusColor = _statusColor;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -300,16 +324,37 @@ class _OfficerListCard extends StatelessWidget {
                   vertical: 7,
                 ),
                 decoration: BoxDecoration(
-                  color: isActive ? AppTheme.primaryBlack : AppTheme.lightGray,
+                  color: _statusBackground,
                   borderRadius: BorderRadius.circular(18),
-                ),
-                child: Text(
-                  isActive ? 'Active' : 'Idle',
-                  style: TextStyle(
-                    color: isActive ? Colors.white : AppTheme.primaryBlack,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
+                  border: Border.all(
+                    color: officer.isOnDutyNow
+                        ? AppTheme.successGreen
+                        : Colors.transparent,
                   ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (officer.isOnDutyNow) ...[
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: const BoxDecoration(
+                          color: AppTheme.successGreen,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    Text(
+                      officer.shiftStatusLabel,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -325,7 +370,11 @@ class _OfficerListCard extends StatelessWidget {
             child: Row(
               children: [
                 Icon(
-                  isActive ? Icons.schedule_rounded : Icons.schedule_outlined,
+                  officer.isOnDutyNow
+                      ? Icons.play_circle_outline_rounded
+                      : officer.hasActiveShift
+                      ? Icons.schedule_rounded
+                      : Icons.schedule_outlined,
                   color: AppTheme.primaryBlack,
                   size: 22,
                 ),
@@ -335,7 +384,7 @@ class _OfficerListCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        isActive ? 'Active shift' : 'No active shift',
+                        officer.shiftSummaryLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(

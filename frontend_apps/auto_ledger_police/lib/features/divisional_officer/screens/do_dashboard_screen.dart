@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/constants/app_routes.dart';
+import '../../../core/storage/token_storage.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/services/auth_service.dart';
 import 'add_traffic_officer_screen.dart';
@@ -186,43 +187,71 @@ class _WelcomeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(22),
-      decoration: BoxDecoration(
-        color: AppTheme.primaryBlack,
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: const Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            Icons.verified_user_outlined,
-            color: Colors.white,
-            size: 34,
+    return FutureBuilder<PoliceSession?>(
+      future: const TokenStorage().getSession(),
+      builder: (context, snapshot) {
+        final session = snapshot.data;
+        final officerName =
+        session?.officerName.trim().isNotEmpty == true
+            ? session!.officerName
+            : 'Officer';
+        final badgeNumber =
+        session?.officerBadgeNumber.trim().isNotEmpty == true
+            ? session!.officerBadgeNumber
+            : 'Divisional Officer';
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            color: AppTheme.primaryBlack,
+            borderRadius: BorderRadius.circular(28),
           ),
-          SizedBox(height: 18),
-          Text(
-            'Welcome, Divisional Officer',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 23,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -0.3,
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.verified_user_outlined,
+                color: Colors.white,
+                size: 34,
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Welcome, $officerName',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 23,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                badgeNumber,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'Manage traffic officers, duty shifts, court cases, and district level statistics from one place.',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                  height: 1.45,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: 8),
-          Text(
-            'Manage traffic officers, duty shifts, court cases, and district level statistics from one place.',
-            style: TextStyle(
-              color: Colors.white70,
-              fontSize: 14,
-              height: 1.45,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

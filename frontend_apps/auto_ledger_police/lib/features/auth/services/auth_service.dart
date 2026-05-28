@@ -34,6 +34,7 @@ class AuthService {
       accessToken: authResponse.accessToken,
       officerId: authResponse.officer.id,
       officerName: authResponse.officer.name,
+      officerBadgeNumber: authResponse.officer.badgeNumber,
       role: authResponse.officer.role,
       districtId: authResponse.officer.districtId,
     );

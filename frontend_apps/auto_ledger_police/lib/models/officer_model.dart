@@ -22,6 +22,59 @@ class OfficerModel {
 
   bool get hasActiveShift => activeShift != null;
 
+  bool get isOnDutyNow {
+    final shift = activeShift;
+
+    if (shift == null || shift.startTime == null || shift.endTime == null) {
+      return false;
+    }
+
+    final now = DateTime.now();
+    final start = shift.startTime!;
+    final end = shift.endTime!;
+
+    return (now.isAtSameMomentAs(start) || now.isAfter(start)) &&
+        (now.isAtSameMomentAs(end) || now.isBefore(end));
+  }
+
+  bool get isShiftScheduled {
+    final shift = activeShift;
+
+    if (shift == null || shift.startTime == null) {
+      return false;
+    }
+
+    return DateTime.now().isBefore(shift.startTime!);
+  }
+
+  bool get isShiftEnded {
+    final shift = activeShift;
+
+    if (shift == null || shift.endTime == null) {
+      return false;
+    }
+
+    return DateTime.now().isAfter(shift.endTime!);
+  }
+
+  String get shiftStatusLabel {
+    if (!hasActiveShift) return 'No Shift';
+    if (isOnDutyNow) return 'On Duty';
+    if (isShiftScheduled) return 'Scheduled';
+    if (isShiftEnded) return 'Shift Ended';
+
+    return 'Off Duty';
+  }
+
+  String get shiftSummaryLabel {
+    if (!hasActiveShift) return 'No assigned shift';
+    if (isOnDutyNow) return 'Currently working';
+    if (isShiftScheduled) return 'Upcoming shift';
+    if (isShiftEnded) return 'Assigned shift ended';
+
+    return 'Outside shift time';
+  }
+
   factory OfficerModel.fromJson(Map<String, dynamic> json) {
     final rawShifts = json['shifts'];
 

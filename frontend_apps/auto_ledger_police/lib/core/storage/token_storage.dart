@@ -7,6 +7,7 @@ class PoliceSession {
     required this.accessToken,
     required this.officerId,
     required this.officerName,
+    required this.officerBadgeNumber,
     required this.role,
     required this.districtId,
     required this.loginAt,
@@ -16,6 +17,7 @@ class PoliceSession {
   final String accessToken;
   final String officerId;
   final String officerName;
+  final String officerBadgeNumber;
   final String role;
   final String districtId;
   final DateTime loginAt;
@@ -45,6 +47,7 @@ class TokenStorage {
   static const String _accessTokenKey = 'access_token';
   static const String _officerIdKey = 'officer_id';
   static const String _officerNameKey = 'officer_name';
+  static const String _officerBadgeNumberKey = 'officer_badge_number';
   static const String _officerRoleKey = 'officer_role';
   static const String _districtIdKey = 'district_id';
   static const String _loginAtKey = 'login_at';
@@ -55,6 +58,7 @@ class TokenStorage {
     required String accessToken,
     required String officerId,
     required String officerName,
+    required String officerBadgeNumber,
     required String role,
     required String districtId,
   }) async {
@@ -64,6 +68,10 @@ class TokenStorage {
     await _storage.write(key: _accessTokenKey, value: accessToken);
     await _storage.write(key: _officerIdKey, value: officerId);
     await _storage.write(key: _officerNameKey, value: officerName);
+    await _storage.write(
+      key: _officerBadgeNumberKey,
+      value: officerBadgeNumber,
+    );
     await _storage.write(key: _officerRoleKey, value: role);
     await _storage.write(key: _districtIdKey, value: districtId);
     await _storage.write(key: _loginAtKey, value: loginAt.toIso8601String());
@@ -88,6 +96,8 @@ class TokenStorage {
     final accessToken = await _storage.read(key: _accessTokenKey);
     final officerId = await _storage.read(key: _officerIdKey);
     final officerName = await _storage.read(key: _officerNameKey);
+    final officerBadgeNumber =
+    await _storage.read(key: _officerBadgeNumberKey);
     final role = await _storage.read(key: _officerRoleKey);
     final districtId = await _storage.read(key: _districtIdKey);
     final loginAtValue = await _storage.read(key: _loginAtKey);
@@ -108,8 +118,8 @@ class TokenStorage {
       return null;
     }
 
-    final tokenExpiresAt = tokenExpiresAtValue == null ||
-        tokenExpiresAtValue.trim().isEmpty
+    final tokenExpiresAt =
+    tokenExpiresAtValue == null || tokenExpiresAtValue.trim().isEmpty
         ? null
         : DateTime.tryParse(tokenExpiresAtValue);
 
@@ -117,6 +127,7 @@ class TokenStorage {
       accessToken: accessToken,
       officerId: officerId,
       officerName: officerName,
+      officerBadgeNumber: officerBadgeNumber ?? '',
       role: role,
       districtId: districtId,
       loginAt: loginAt,
@@ -135,6 +146,7 @@ class TokenStorage {
     await _storage.delete(key: _accessTokenKey);
     await _storage.delete(key: _officerIdKey);
     await _storage.delete(key: _officerNameKey);
+    await _storage.delete(key: _officerBadgeNumberKey);
     await _storage.delete(key: _officerRoleKey);
     await _storage.delete(key: _districtIdKey);
     await _storage.delete(key: _loginAtKey);
