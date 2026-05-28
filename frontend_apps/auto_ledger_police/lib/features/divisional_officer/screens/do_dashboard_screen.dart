@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/constants/app_routes.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/utils/app_error_handler.dart';
+import '../../auth/services/auth_service.dart';
 import 'add_traffic_officer_screen.dart';
 import 'assign_shift_screen.dart';
 import 'court_cases_screen.dart';
@@ -11,11 +12,14 @@ import 'traffic_officer_list_screen.dart';
 class DoDashboardScreen extends StatelessWidget {
   const DoDashboardScreen({super.key});
 
-  void _showPendingMessage(BuildContext context, String featureName) {
-    AppErrorHandler.showPopup(
-      context,
-      message: '$featureName will be connected next.',
-      isError: false,
+  Future<void> _handleLogout(BuildContext context) async {
+    await AuthService().logout();
+
+    if (!context.mounted) return;
+
+    Navigator.of(context).pushNamedAndRemoveUntil(
+      AppRoutes.login,
+          (route) => false,
     );
   }
 
@@ -45,7 +49,7 @@ class DoDashboardScreen extends StatelessWidget {
                   children: [
                     const SizedBox(height: 22),
                     _DashboardHeader(
-                      onLogout: () => _showPendingMessage(context, 'Logout'),
+                      onLogout: () => _handleLogout(context),
                     ),
                     const SizedBox(height: 26),
                     const _WelcomeCard(),

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/constants/app_routes.dart';
+import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/app_error_handler.dart';
 import '../../../shared/widgets/app_button.dart';
 import '../../../shared/widgets/app_text_field.dart';
-import '../../divisional_officer/screens/do_dashboard_screen.dart';
+import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,6 +19,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _badgeController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _authService = AuthService();
 
   bool _isPasswordHidden = true;
   bool _isLoading = false;
@@ -28,7 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _handleLogin() {
+  Future<void> _handleLogin() async {
     FocusScope.of(context).unfocus();
 
     if (!_formKey.currentState!.validate()) {
@@ -41,17 +44,55 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    Future.delayed(const Duration(milliseconds: 700), () {
+    try {
+      final response = await _authService.login(
+        badgeNumber: _badgeController.text,
+        password: _passwordController.text,
+      );
+
       if (!mounted) return;
 
-      setState(() => _isLoading = false);
+      final role = response.officer.role;
 
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => const DoDashboardScreen(),
-        ),
+      if (role == 'DIVISIONAL_HEAD') {
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.divisionalDashboard,
+              (route) => false,
+        );
+        return;
+      }
+
+      if (role == 'TRAFFIC_OFFICER') {
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          AppRoutes.trafficOfficerDashboard,
+              (route) => false,
+        );
+        return;
+      }
+
+      AppErrorHandler.showPopup(
+        context,
+        message: 'Unsupported officer role.',
       );
-    });
+    } on ApiException catch (error) {
+      if (!mounted) return;
+
+      AppErrorHandler.showPopup(
+        context,
+        message: error.message,
+      );
+    } catch (_) {
+      if (!mounted) return;
+
+      AppErrorHandler.showPopup(
+        context,
+        message: 'Unable to login. Please check your connection.',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override

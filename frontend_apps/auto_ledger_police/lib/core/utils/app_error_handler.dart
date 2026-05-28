@@ -11,6 +11,8 @@ class AppErrorHandler {
         bool isError = true,
       }) {
     final overlay = Overlay.of(context);
+    final color = isError ? AppTheme.errorRed : AppTheme.successGreen;
+    final icon = isError ? Icons.error_outline : Icons.check_circle_outline;
 
     final entry = OverlayEntry(
       builder: (context) {
@@ -23,11 +25,9 @@ class AppErrorHandler {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: BoxDecoration(
-                color: isError ? AppTheme.primaryBlack : Colors.white,
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: isError ? AppTheme.primaryBlack : AppTheme.borderGray,
-                ),
+                border: Border.all(color: color),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha: 0.16),
@@ -39,8 +39,8 @@ class AppErrorHandler {
               child: Row(
                 children: [
                   Icon(
-                    isError ? Icons.error_outline : Icons.check_circle_outline,
-                    color: isError ? Colors.white : AppTheme.primaryBlack,
+                    icon,
+                    color: color,
                     size: 22,
                   ),
                   const SizedBox(width: 12),
@@ -48,9 +48,9 @@ class AppErrorHandler {
                     child: Text(
                       message,
                       style: TextStyle(
-                        color: isError ? Colors.white : AppTheme.primaryBlack,
+                        color: color,
                         fontSize: 14,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                   ),
