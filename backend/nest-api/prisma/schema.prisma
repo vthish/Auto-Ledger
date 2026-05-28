@@ -73,10 +73,10 @@ model OffenseCategory {
 }
 
 model Fine {
-  id       String     @id @default(uuid())
-  issuedAt DateTime   @default(now())
-  dueDate  DateTime?
-  status   FineStatus @default(PENDING)
+  id        String     @id @default(uuid())
+  issuedAt  DateTime   @default(now())
+  dueDate   DateTime?
+  status    FineStatus @default(PENDING)
 
   licenseId String
   license   License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
@@ -84,8 +84,7 @@ model Fine {
   officerId String
   officer   Officer @relation(fields: [officerId], references: [id])
 
-  offenseCategoryId String
-  offenseCategory   OffenseCategory @relation(fields: [offenseCategoryId], references: [id])
+  offenses  OffenseCategory[]
 }
 
 enum LicenseStatus {
