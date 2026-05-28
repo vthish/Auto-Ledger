@@ -109,21 +109,40 @@ export class FinesService {
 
     const isCourtCase = offenses.some((off) => off.isCourtCase);
 
-    const newLicenseStatus: LicenseStatus = isCourtCase
-      ? LicenseStatus.COURT_PENDING
-      : LicenseStatus.SUSPENDED;
-
+    let newLicenseStatus: LicenseStatus;
     let tempExpiryDate: Date | null = null;
-    if (!isCourtCase) {
+    let fineDueDate: Date | null = null;
+
+    if (newPoints > 50) {
+      newLicenseStatus = LicenseStatus.REVOKED;
+      tempExpiryDate = null;
+    } else if (newPoints === 50) {
+      newLicenseStatus = LicenseStatus.SUSPENDED;
       tempExpiryDate = new Date();
-      tempExpiryDate.setDate(tempExpiryDate.getDate() + 14);
+      tempExpiryDate.setFullYear(tempExpiryDate.getFullYear() + 5);
+    } else if (newPoints >= 24) {
+      newLicenseStatus = LicenseStatus.SUSPENDED;
+      tempExpiryDate = new Date();
+      tempExpiryDate.setFullYear(tempExpiryDate.getFullYear() + 1);
+    } else {
+      newLicenseStatus = isCourtCase
+        ? LicenseStatus.COURT_PENDING
+        : LicenseStatus.SUSPENDED;
+      if (!isCourtCase) {
+        tempExpiryDate = new Date();
+        tempExpiryDate.setDate(tempExpiryDate.getDate() + 14);
+      }
+    }
+
+    if (!isCourtCase) {
+      fineDueDate = new Date();
+      fineDueDate.setDate(fineDueDate.getDate() + 14);
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
       const fineStatus = isCourtCase
         ? FineStatus.COURT_CASE
         : FineStatus.PENDING;
-      const fineDueDate = isCourtCase ? null : tempExpiryDate;
 
       const createdFine = await tx.fine.create({
         data: {
