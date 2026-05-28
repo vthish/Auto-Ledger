@@ -23,7 +23,7 @@ Developed as the Final Year Project for HND in Software Engineering.
 ![Hosted on Render](https://img.shields.io/badge/Hosted_on-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)
 
 * **Main API Base URL:** [https://auto-ledger-api.onrender.com](https://auto-ledger-api.onrender.com)
-* **Mock DMT API:** [https://auto-ledger-mock-dmt.onrender.com](https://auto-ledger-mock-dmt.onrender.com)
+* **Mock DMT API:** [https://auto-ledger-mock-dmt-yv7q.onrender.com](https://auto-ledger-mock-dmt-yv7q.onrender.com)
 
 ## 🤝 Development Team
 
