@@ -18,6 +18,7 @@ import {
   ApiOperation,
   ApiBearerAuth,
   ApiProperty,
+  ApiCreatedResponse,
 } from '@nestjs/swagger';
 
 export class IssueFineDto {
@@ -57,6 +58,36 @@ export class FinesController {
   constructor(private readonly finesService: FinesService) {}
 
   @ApiOperation({ summary: 'Issue a new fine' })
+  @ApiCreatedResponse({
+    description: 'Fine issued successfully',
+    schema: {
+      example: {
+        fineDetails: [
+          {
+            id: 'e144b945-98ce-4360-90a3-...',
+            issuedAt: '2026-05-28T10:30:00.000Z',
+            dueDate: '2026-06-11T10:30:00.000Z',
+            status: 'PENDING',
+            licenseId: '76de90a7-cbc7-4093-...',
+            officerId: 'bcfd3654-faa3-4c2a-...',
+            offenses: [
+              {
+                name: 'වේගයෙන් පැදවීම (Speeding)',
+                amount: 1000,
+              },
+              {
+                name: 'ආරක්ෂක හිස් වැසුම් නොපැළඳීම',
+                amount: 500,
+              },
+            ],
+          },
+        ],
+        licenseStatus: 'SUSPENDED',
+        accumulatedPoints: 3,
+        temporaryLicenseExpiry: '2026-06-11T10:30:00.000Z',
+      },
+    },
+  })
   @Post('issue')
   async issueFine(@Body() fineData: IssueFineDto) {
     return this.finesService.issueFine(fineData);
