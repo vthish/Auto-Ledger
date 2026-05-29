@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "663237094439",
+    "project_id": "auto-ledger-41d16",
+    "storage_bucket": "auto-ledger-41d16.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:663237094439:android:acdc387c864d6c0703b202",
+        "android_client_info": {
+          "package_name": "com.example.auto_ledger"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB22a7ZLYFaUusG_D7wzyzg6Df_Io-zLn4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
