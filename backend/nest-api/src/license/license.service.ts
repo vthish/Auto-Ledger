@@ -5,196 +5,124 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { HttpService } from '@nestjs/axios';
-import { JwtService } from '@nestjs/jwt';
-import { firstValueFrom } from 'rxjs';
-import { isAxiosError } from 'axios';
-
-interface DmtApiResponse {
-  success: boolean;
-  data: {
-    licenseNumber: string;
-    fullName: string;
-    address: string;
-    dob: string;
-    bloodGroup: string;
-    dateOfIssue: string;
-    vehicleCategories: Array<{
-      class: string;
-      issueDate: string;
-      expiryDate: string;
-    }>;
-  };
-}
-
-interface QrPayload {
-  userId: string;
-  nic: string;
-  licenseNumber: string;
-}
+import * as crypto from 'crypto';
 
 @Injectable()
 export class LicenseService {
-  constructor(
-    private prisma: PrismaService,
-    private httpService: HttpService,
-    private jwtService: JwtService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
-  async issueLicense(data: { nic: string; userId: string }) {
-    const dmtApiUrl =
-      process.env.DMT_API_URL || 'http://localhost:4000/api/dmt/license';
-
-    try {
-      const response = await firstValueFrom(
-        this.httpService.get<DmtApiResponse>(`${dmtApiUrl}/${data.nic}`),
-      );
-
-      const dmtData = response.data.data;
-
-      return await this.prisma.license.create({
-        data: {
-          licenseNumber: dmtData.licenseNumber,
-          expiryDate: new Date(dmtData.vehicleCategories[0].expiryDate),
-          userId: data.userId,
-        },
-      });
-    } catch (error: unknown) {
-      if (isAxiosError(error) && error.response?.status === 404) {
-        throw new NotFoundException(
-          'DMT Error: No driving license found for this NIC number.',
-        );
-      }
-      throw new BadRequestException(
-        'System Error: Could not connect to DMT Server.',
-      );
-    }
-  }
-
-  async getVirtualCardDetails(userId: string) {
-    const license = await this.prisma.license.findUnique({
-      where: { userId },
-      include: { user: true },
+  // 1. Create a License (DMT Admin)
+  async createLicense(data: {
+    licenseNo: string;
+    issueDate: Date;
+    expiryDate: Date;
+    userId: string;
+    dmtAdminId: string;
+    image?: string;
+  }) {
+    return await this.prisma.driving_License.create({
+      data: {
+        license_No: data.licenseNo,
+        issue_Date: data.issueDate,
+        expiry_Date: data.expiryDate,
+        user_Id: data.userId,
+        dmt_Admin_Id: data.dmtAdminId,
+        image: data.image,
+      },
     });
-
-    if (!license) {
-      throw new NotFoundException('License record not found in local system.');
-    }
-
-    const dmtApiUrl =
-      process.env.DMT_API_URL || 'http://localhost:4000/api/dmt/license';
-
-    try {
-      const response = await firstValueFrom(
-        this.httpService.get<DmtApiResponse>(
-          `${dmtApiUrl}/${license.user.nic}`,
-        ),
-      );
-
-      const dmtData = response.data.data;
-
-      const qrPayload: QrPayload = {
-        userId: license.userId,
-        nic: license.user.nic,
-        licenseNumber: license.licenseNumber,
-      };
-
-      const qrToken = this.jwtService.sign(qrPayload, { expiresIn: '1m' });
-
-      return {
-        licenseNumber: license.licenseNumber,
-        status: license.status,
-        points: license.points,
-        temporaryLicenseExpiry: license.temporaryLicenseExpiry,
-        fullName: dmtData.fullName,
-        address: dmtData.address,
-        dob: dmtData.dob,
-        bloodGroup: dmtData.bloodGroup,
-        vehicleCategories: dmtData.vehicleCategories,
-        qrToken: qrToken,
-      };
-    } catch (error: unknown) {
-      if (isAxiosError(error) && error.response?.status === 404) {
-        throw new NotFoundException(
-          'DMT Error: Legal license details not found.',
-        );
-      }
-      throw new BadRequestException(
-        'System Error: Unable to fetch data from DMT.',
-      );
-    }
   }
 
-  async getLicenseByQrToken(token: string) {
-    try {
-      const decoded: QrPayload = this.jwtService.verify(token);
-      const userId = decoded.userId;
-
-      const license = await this.prisma.license.findUnique({
-        where: { userId },
-        include: { user: true },
-      });
-
-      if (!license) {
-        throw new NotFoundException('License not found.');
-      }
-
-      const dmtApiUrl =
-        process.env.DMT_API_URL || 'http://localhost:4000/api/dmt/license';
-      const response = await firstValueFrom(
-        this.httpService.get<DmtApiResponse>(
-          `${dmtApiUrl}/${license.user.nic}`,
-        ),
-      );
-
-      const dmtData = response.data.data;
-
-      return {
-        licenseNumber: license.licenseNumber,
-        status: license.status,
-        points: license.points,
-        temporaryLicenseExpiry: license.temporaryLicenseExpiry,
-        fullName: dmtData.fullName,
-        address: dmtData.address,
-        dob: dmtData.dob,
-        bloodGroup: dmtData.bloodGroup,
-        vehicleCategories: dmtData.vehicleCategories,
-      };
-    } catch {
-      throw new UnauthorizedException(
-        'QR Code has expired or is invalid. Please scan again.',
-      );
-    }
-  }
-
-  async getLicenseById(id: string) {
-    const license = await this.prisma.license.findUnique({
-      where: { id },
-      include: { user: true },
+  // 2. Get User's Active License
+  async getMyLicense(userId: string) {
+    const license = await this.prisma.driving_License.findUnique({
+      where: { user_Id: userId },
+      include: {
+        fines: { where: { status: 'PENDING' } },
+        temporaryLicenses: true,
+      },
     });
-
-    if (!license) {
-      throw new NotFoundException('License not found in the system');
-    }
+    if (!license) throw new NotFoundException('License not found');
     return license;
   }
 
-  async updateLicense(
-    id: string,
-    data: { expiryDate?: string; points?: number },
-  ) {
-    const updateData: { points?: number; expiryDate?: Date } = {
-      points: data.points,
-    };
+  // 3. Generate 3-Minute QR Code (Driver Mobile App)
+  async generateLicenseQR(userId: string) {
+    const license = await this.prisma.driving_License.findUnique({
+      where: { user_Id: userId },
+    });
 
-    if (data.expiryDate) {
-      updateData.expiryDate = new Date(data.expiryDate);
-    }
+    if (!license) throw new NotFoundException('Active license not found');
+    if (license.status !== 'ACTIVE')
+      throw new BadRequestException(`License is ${license.status}`);
 
-    return this.prisma.license.update({ where: { id }, data: updateData });
+    // Generate a secure token and append expiration time (3 minutes from now)
+    const expiryTime = Date.now() + 3 * 60 * 1000;
+    const randomToken = crypto.randomBytes(16).toString('hex');
+    const qrToken = `${license.license_Id}:${randomToken}:${expiryTime}`;
+
+    return { qrToken, expiresAt: new Date(expiryTime) };
   }
 
-  async deleteLicense(id: string) {
-    return this.prisma.license.delete({ where: { id } });
+  // 4. Scan QR & Save History (Traffic Officer App)
+  async scanLicenseQR(
+    qrToken: string,
+    trafficOfficerId: string,
+    location?: string,
+  ) {
+    const parts = qrToken.split(':');
+    if (parts.length !== 3) throw new BadRequestException('Invalid QR format');
+
+    const licenseId = parts[0];
+    const expiryTime = parseInt(parts[2], 10);
+
+    // Check if 3 minutes have passed
+    if (Date.now() > expiryTime) {
+      throw new BadRequestException(
+        'QR Code has expired. Please ask driver to refresh.',
+      );
+    }
+
+    const license = await this.prisma.driving_License.findUnique({
+      where: { license_Id: licenseId },
+      include: { user: true },
+    });
+
+    if (!license) throw new NotFoundException('License not found');
+
+    const officer = await this.prisma.traffic_Officer.findUnique({
+      where: { traffic_Officer_Id: trafficOfficerId },
+    });
+
+    if (!officer) throw new UnauthorizedException('Invalid Officer');
+
+    // Save to QR_Scan_History
+    await this.prisma.qR_Scan_History.create({
+      data: {
+        qr_Token: qrToken,
+        traffic_Officer_Name: officer.name,
+        driver_Name: license.user.name,
+        location: location,
+        license_Id: license.license_Id,
+      },
+    });
+
+    return {
+      message: 'Scan successful',
+      driverName: license.user.name,
+      licenseNo: license.license_No,
+      status: license.status,
+      points: license.points,
+    };
+  }
+
+  // 5. Update License Status
+  async updateStatus(
+    licenseId: string,
+    newStatus: 'ACTIVE' | 'SUSPENDED' | 'EXPIRED' | 'REVOKED',
+  ) {
+    return this.prisma.driving_License.update({
+      where: { license_Id: licenseId },
+      data: { status: newStatus },
+    });
   }
 }

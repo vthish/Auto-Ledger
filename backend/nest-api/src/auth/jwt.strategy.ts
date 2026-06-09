@@ -5,8 +5,9 @@ import { Injectable } from '@nestjs/common';
 interface JwtPayload {
   sub: string;
   role: string;
-  badgeNumber?: string;
-  districtId?: string;
+  badgeNo?: string;
+  divisionId?: string;
+  headId?: string;
   nic?: string;
 }
 
@@ -22,18 +23,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   validate(payload: JwtPayload) {
     if (payload.role === 'USER') {
-      return {
-        id: payload.sub,
-        role: payload.role,
-        nic: payload.nic,
-      };
+      return { id: payload.sub, role: payload.role, nic: payload.nic };
+    }
+
+    if (payload.role === 'DMT_ADMIN' || payload.role === 'POLICE_ADMIN') {
+      return { id: payload.sub, role: payload.role };
     }
 
     return {
       id: payload.sub,
-      badgeNumber: payload.badgeNumber,
       role: payload.role,
-      districtId: payload.districtId,
+      badgeNo: payload.badgeNo,
+      divisionId: payload.divisionId,
+      headId: payload.headId,
     };
   }
 }
