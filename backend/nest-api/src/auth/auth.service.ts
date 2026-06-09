@@ -171,11 +171,9 @@ export class AuthService {
       throw new UnauthorizedException('Invalid NIC or password.');
 
     if (user.device_Id !== deviceId) {
-      return {
-        status: 'OTP_REQUIRED',
-        message: 'New device detected. Please verify with OTP.',
-        nic: user.nic_No,
-      };
+      throw new UnauthorizedException(
+        'Access Denied: You can only log in from your registered device.',
+      );
     }
 
     return this.generateUserToken(user);

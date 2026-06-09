@@ -14,6 +14,7 @@ export class FinesService {
     licenseId: string;
     officerId: string;
     offenseIds: string[];
+    comment?: string;
   }) {
     const officer = await this.prisma.traffic_Officer.findUnique({
       where: { traffic_Officer_Id: data.officerId },
@@ -31,7 +32,7 @@ export class FinesService {
     if (offenses.length === 0)
       throw new BadRequestException('Invalid offenses');
 
-    let isCourtCase = offenses.some((o) => o.is_Court_Case);
+    const isCourtCase = offenses.some((o) => o.is_Court_Case);
     const fineDueDate = new Date();
     fineDueDate.setDate(fineDueDate.getDate() + 14);
 
@@ -43,6 +44,7 @@ export class FinesService {
           traffic_Officer_Id: data.officerId,
           due_Date: fineDueDate,
           status: 'PENDING',
+          comment: data.comment,
         },
       });
 
@@ -77,7 +79,7 @@ export class FinesService {
     });
   }
 
-  // 2. Get My Fines (Driver App)
+  //Get My Fines (Driver App)
   async getMyFines(userId: string) {
     const license = await this.prisma.driving_License.findUnique({
       where: { user_Id: userId },

@@ -11,8 +11,17 @@ import {
 import { FinesService } from './fines.service';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { IsString, IsNotEmpty, IsArray, IsEnum } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsArray,
+  IsEnum,
+  IsOptional,
+} from 'class-validator';
 
+export interface AuthRequest {
+  user: { id: string };
+}
 export class IssueFineDto {
   @IsString()
   @IsNotEmpty()
@@ -21,6 +30,10 @@ export class IssueFineDto {
   @IsArray()
   @IsString({ each: true })
   offenseIds: string[];
+
+  @IsString()
+  @IsOptional()
+  comment?: string;
 }
 
 export class CourtVerdictDto {
@@ -37,17 +50,18 @@ export class FinesController {
 
   @ApiOperation({ summary: 'Issue a new fine (Traffic Officer Only)' })
   @Post()
-  async issueFine(@Request() req, @Body() data: IssueFineDto) {
+  async issueFine(@Request() req: AuthRequest, @Body() data: IssueFineDto) {
     return this.finesService.issueFine({
       licenseId: data.licenseId,
       officerId: req.user.id,
       offenseIds: data.offenseIds,
+      comment: data.comment,
     });
   }
 
   @ApiOperation({ summary: 'Get all fines for current driver' })
   @Get('my-fines')
-  async getMyFines(@Request() req) {
+  async getMyFines(@Request() req: AuthRequest) {
     return this.finesService.getMyFines(req.user.id);
   }
 

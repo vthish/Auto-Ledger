@@ -19,6 +19,10 @@ import {
   IsOptional,
 } from 'class-validator';
 
+export interface AuthRequest {
+  user: { id: string };
+}
+
 export class CreateLicenseDto {
   @IsString()
   @IsNotEmpty()
@@ -63,28 +67,35 @@ export class LicenseController {
 
   @ApiOperation({ summary: 'Create a new driving license (DMT Admin Only)' })
   @Post()
-  async createLicense(@Request() req, @Body() data: CreateLicenseDto) {
+  async createLicense(
+    @Request() req: AuthRequest,
+    @Body() data: CreateLicenseDto,
+  ) {
     return this.licenseService.createLicense({
-      ...data,
+      licenseNo: data.licenseNo,
+      issueDate: data.issueDate,
+      expiryDate: data.expiryDate,
+      userId: data.userId,
+      image: data.image,
       dmtAdminId: req.user.id,
     });
   }
 
   @ApiOperation({ summary: 'Get current user active license' })
   @Get('my-license')
-  async getMyLicense(@Request() req) {
+  async getMyLicense(@Request() req: AuthRequest) {
     return this.licenseService.getMyLicense(req.user.id);
   }
 
   @ApiOperation({ summary: 'Generate 3-Minute QR Code for License' })
   @Get('generate-qr')
-  async generateQR(@Request() req) {
+  async generateQR(@Request() req: AuthRequest) {
     return this.licenseService.generateLicenseQR(req.user.id);
   }
 
   @ApiOperation({ summary: 'Scan License QR Code (Traffic Officer Only)' })
   @Post('scan-qr')
-  async scanQR(@Request() req, @Body() data: ScanQRDto) {
+  async scanQR(@Request() req: AuthRequest, @Body() data: ScanQRDto) {
     return this.licenseService.scanLicenseQR(
       data.qrToken,
       req.user.id,
