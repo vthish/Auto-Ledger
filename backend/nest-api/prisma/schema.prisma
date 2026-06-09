@@ -7,114 +7,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id              String   @id @default(uuid())
-  nic             String   @unique
-  phoneNumber     String   @unique
-  name            String
-  password        String
-  deviceId        String?
-  isPhoneVerified Boolean  @default(false)
-  license         License?
-}
-
-model License {
-  id                     String        @id @default(uuid())
-  licenseNumber          String        @unique
-  issueDate              DateTime      @default(now())
-  expiryDate             DateTime
-  points                 Int           @default(0)
-  status                 LicenseStatus @default(ACTIVE)
-  temporaryLicenseExpiry DateTime?
-
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fines  Fine[]
-}
-
-model District {
-  id            String    @id @default(uuid())
-  name          String    @unique
-  headOfficerId String?   @unique
-  officers      Officer[]
-}
-
-model Officer {
-  id          String      @id @default(uuid())
-  badgeNumber String      @unique
-  name        String
-  password    String
-  role        OfficerRole @default(TRAFFIC_OFFICER)
-
-  districtId  String
-  district    District @relation(fields: [districtId], references: [id])
-  finesIssued Fine[]
-  shifts      Shift[]
-}
-
-model Shift {
-  id        String   @id @default(uuid())
-  startTime DateTime
-  endTime   DateTime
-  isActive  Boolean  @default(true)
-
-  officerId String
-  officer   Officer @relation(fields: [officerId], references: [id], onDelete: Cascade)
-}
-
-model OffenseCategory {
-  id          String   @id @default(uuid())
-  code        String   @unique
-  name        String
-  points      Int
-  isCourtCase Boolean  @default(false)
-  amount      Float    @default(0.0) 
-  fines       Fine[]
-}
-
-model Fine {
-  id        String     @id @default(uuid())
-  issuedAt  DateTime   @default(now())
-  dueDate   DateTime?
-  status    FineStatus @default(PENDING)
-
-  licenseId String
-  license   License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
-
-  officerId String
-  officer   Officer @relation(fields: [officerId], references: [id])
-
-  offenses  OffenseCategory[]
-}
-
-enum LicenseStatus {
-  ACTIVE
-  SUSPENDED
-  REVOKED
-  COURT_PENDING
-}
-
-enum FineStatus {
-  PENDING
-  PAID
-  OVERDUE
-  COURT_CASE
-  RESOLVED
-}
-
-enum OfficerRole {
-  TRAFFIC_OFFICER
-  DIVISIONAL_HEAD
-  SYSTEM_ADMIN
-}generator client {
-  provider = "prisma-client-js"
-}
-
-datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
 enum License_Status {
   ACTIVE
   SUSPENDED
@@ -151,8 +43,7 @@ model QR_Scan_History {
 
   license_Id           String
 
-  license Driving_License
-    @relation(fields: [license_Id], references: [license_Id])
+  license Driving_License @relation(fields: [license_Id], references: [license_Id])
 }
 
 model DMT_Admin {
@@ -209,13 +100,11 @@ model Driving_License {
 
   user_Id String @unique
 
-  user User
-    @relation(fields: [user_Id], references: [user_Id])
+  user User @relation(fields: [user_Id], references: [user_Id])
 
   dmt_Admin_Id String
 
-  dmtAdmin DMT_Admin
-    @relation(fields: [dmt_Admin_Id], references: [dmt_Admin_Id])
+  dmtAdmin DMT_Admin @relation(fields: [dmt_Admin_Id], references: [dmt_Admin_Id])
 
   fines Fine[]
 
@@ -233,8 +122,7 @@ model Temporary_License {
 
   license_Id String
 
-  license Driving_License
-    @relation(fields: [license_Id], references: [license_Id])
+  license Driving_License @relation(fields: [license_Id], references: [license_Id])
 }
 
 model Division {
@@ -244,8 +132,7 @@ model Division {
 
   police_Admin_Id String
 
-  policeAdmin Police_Admin
-    @relation(fields: [police_Admin_Id], references: [police_Admin_Id])
+  policeAdmin Police_Admin @relation(fields: [police_Admin_Id], references: [police_Admin_Id])
 
   divisionalHead Divisional_Head?
 }
@@ -261,8 +148,7 @@ model Divisional_Head {
 
   division_Id String @unique
 
-  division Division
-    @relation(fields: [division_Id], references: [division_Id])
+  division Division @relation(fields: [division_Id], references: [division_Id])
 
   officers Traffic_Officer[]
 }
@@ -280,8 +166,7 @@ model Traffic_Officer {
 
   divisional_Head_Id String
 
-  divisionalHead Divisional_Head
-    @relation(fields: [divisional_Head_Id], references: [divisional_Head_Id])
+  divisionalHead Divisional_Head @relation(fields: [divisional_Head_Id], references: [divisional_Head_Id])
 
   shifts Shift[]
 
@@ -303,8 +188,7 @@ model Shift {
 
   traffic_Officer_Id String
 
-  trafficOfficer Traffic_Officer
-    @relation(fields: [traffic_Officer_Id], references: [traffic_Officer_Id])
+  trafficOfficer Traffic_Officer @relation(fields: [traffic_Officer_Id], references: [traffic_Officer_Id])
 }
 
 model Offence_Category {
@@ -322,8 +206,7 @@ model Offence_Category {
 
   police_Admin_Id String
 
-  policeAdmin Police_Admin
-    @relation(fields: [police_Admin_Id], references: [police_Admin_Id])
+  policeAdmin Police_Admin @relation(fields: [police_Admin_Id], references: [police_Admin_Id])
 
   fines Fine_Offence[]
 }
@@ -339,13 +222,11 @@ model Fine {
 
   license_Id String
 
-  license Driving_License
-    @relation(fields: [license_Id], references: [license_Id])
+  license Driving_License @relation(fields: [license_Id], references: [license_Id])
 
   traffic_Officer_Id String
 
-  trafficOfficer Traffic_Officer
-    @relation(fields: [traffic_Officer_Id], references: [traffic_Officer_Id])
+  trafficOfficer Traffic_Officer @relation(fields: [traffic_Officer_Id], references: [traffic_Officer_Id])
 
   offenses Fine_Offence[]
 
@@ -357,11 +238,9 @@ model Fine_Offence {
 
   offense_Id String
 
-  fine Fine
-    @relation(fields: [fine_Id], references: [fine_Id])
+  fine Fine @relation(fields: [fine_Id], references: [fine_Id])
 
-  offenceCategory Offence_Category
-    @relation(fields: [offense_Id], references: [offense_Id])
+  offenceCategory Offence_Category @relation(fields: [offense_Id], references: [offense_Id])
 
   @@id([fine_Id, offense_Id])
 }
@@ -377,6 +256,5 @@ model Payment {
 
   fine_Id String @unique
 
-  fine Fine
-    @relation(fields: [fine_Id], references: [fine_Id])
+  fine Fine @relation(fields: [fine_Id], references: [fine_Id])
 }
