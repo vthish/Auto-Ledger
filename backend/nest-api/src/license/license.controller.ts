@@ -17,16 +17,19 @@ import {
   IsDateString,
   IsEnum,
   IsOptional,
+  IsArray,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export interface AuthRequest {
   user: { id: string };
 }
 
-export class CreateLicenseDto {
+export class VehicleCategoryDto {
   @IsString()
   @IsNotEmpty()
-  licenseNo: string;
+  vehicleClass: string;
 
   @IsDateString()
   issueDate: Date;
@@ -35,12 +38,41 @@ export class CreateLicenseDto {
   expiryDate: Date;
 
   @IsString()
+  @IsOptional()
+  restriction?: string;
+}
+
+export class CreateLicenseDto {
+  @IsString()
+  @IsNotEmpty()
+  licenseNo: string;
+
+  @IsString()
+  @IsNotEmpty()
+  address: string;
+
+  @IsString()
+  @IsNotEmpty()
+  bloodGroup: string;
+
+  @IsDateString()
+  dateOfBirth: Date;
+
+  @IsDateString()
+  issueDate: Date;
+
+  @IsString()
   @IsNotEmpty()
   userId: string;
 
   @IsString()
   @IsOptional()
   image?: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => VehicleCategoryDto)
+  categories: VehicleCategoryDto[];
 }
 
 export class ScanQRDto {
@@ -73,10 +105,13 @@ export class LicenseController {
   ) {
     return this.licenseService.createLicense({
       licenseNo: data.licenseNo,
+      address: data.address,
+      bloodGroup: data.bloodGroup,
+      dateOfBirth: data.dateOfBirth,
       issueDate: data.issueDate,
-      expiryDate: data.expiryDate,
       userId: data.userId,
       image: data.image,
+      categories: data.categories,
       dmtAdminId: req.user.id,
     });
   }

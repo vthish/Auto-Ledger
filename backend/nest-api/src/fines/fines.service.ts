@@ -5,11 +5,25 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
+export interface CreateOffenseData {
+  code: string;
+  name: string;
+  points: number;
+  amount: number;
+  isCourtCase: boolean;
+}
+
+export interface UpdateOffenseData {
+  name?: string;
+  points?: number;
+  amount?: number;
+  isCourtCase?: boolean;
+}
+
 @Injectable()
 export class FinesService {
   constructor(private prisma: PrismaService) {}
 
-  // 1. Issue a Fine
   async issueFine(data: {
     licenseId: string;
     officerId: string;
@@ -37,25 +51,22 @@ export class FinesService {
     fineDueDate.setDate(fineDueDate.getDate() + 14);
 
     return this.prisma.$transaction(async (tx) => {
-      // Create the fine
       const fine = await tx.fine.create({
         data: {
           license_Id: data.licenseId,
           traffic_Officer_Id: data.officerId,
           due_Date: fineDueDate,
           status: 'PENDING',
-          comment: data.comment,
+          comment: data.comment || null,
         },
       });
 
-      // Link offences to the bridge table
       for (const offense of offenses) {
         await tx.fine_Offence.create({
           data: { fine_Id: fine.fine_Id, offense_Id: offense.offense_Id },
         });
       }
 
-      // If NOT a court case, issue Temporary License
       if (!isCourtCase) {
         await tx.temporary_License.create({
           data: {
@@ -65,7 +76,6 @@ export class FinesService {
         });
       }
 
-      // Deduct Points
       const totalPoints = offenses.reduce(
         (sum, off) => sum + off.points_Value,
         0,
@@ -79,7 +89,6 @@ export class FinesService {
     });
   }
 
-  //Get My Fines (Driver App)
   async getMyFines(userId: string) {
     const license = await this.prisma.driving_License.findUnique({
       where: { user_Id: userId },
@@ -97,7 +106,6 @@ export class FinesService {
     });
   }
 
-  // 3. Process Court Case Verdict (Divisional Head)
   async updateCourtCase(fineId: string, verdict: 'ACTIVE' | 'REVOKED') {
     const fine = await this.prisma.fine.findUnique({
       where: { fine_Id: fineId },
@@ -105,13 +113,11 @@ export class FinesService {
     if (!fine) throw new NotFoundException('Fine not found');
 
     return this.prisma.$transaction(async (tx) => {
-      // Mark fine as paid/closed
       await tx.fine.update({
         where: { fine_Id: fineId },
         data: { status: 'PAID' },
       });
 
-      // Update license status and reset points if ACTIVE
       return tx.driving_License.update({
         where: { license_Id: fine.license_Id },
         data: {
@@ -119,6 +125,47 @@ export class FinesService {
           points: verdict === 'ACTIVE' ? 24 : 0,
         },
       });
+    });
+  }
+
+  async createOffenseCategory(data: CreateOffenseData, policeAdminId: string) {
+    return this.prisma.offence_Category.create({
+      data: {
+        code: data.code,
+        name: data.name,
+        points_Value: data.points,
+        amount: data.amount,
+        is_Court_Case: data.isCourtCase,
+        police_Admin_Id: policeAdminId,
+      },
+    });
+  }
+
+  async updateOffenseCategory(offenseId: string, data: UpdateOffenseData) {
+    const existing = await this.prisma.offence_Category.findUnique({
+      where: { offense_Id: offenseId },
+    });
+    if (!existing) throw new NotFoundException('Offense Category not found');
+
+    return this.prisma.offence_Category.update({
+      where: { offense_Id: offenseId },
+      data: {
+        name: data.name ?? existing.name,
+        points_Value: data.points ?? existing.points_Value,
+        amount: data.amount ?? existing.amount,
+        is_Court_Case: data.isCourtCase ?? existing.is_Court_Case,
+      },
+    });
+  }
+
+  async deleteOffenseCategory(offenseId: string) {
+    const existing = await this.prisma.offence_Category.findUnique({
+      where: { offense_Id: offenseId },
+    });
+    if (!existing) throw new NotFoundException('Offense Category not found');
+
+    return this.prisma.offence_Category.delete({
+      where: { offense_Id: offenseId },
     });
   }
 }
