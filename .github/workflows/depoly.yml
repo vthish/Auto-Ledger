@@ -20,6 +20,6 @@ jobs:
                   username: ${{ secrets.AWS_USER }}
                   key: ${{ secrets.AWS_SSH_KEY }}
                   script: |
-                      cd ~/auto-ledger
+                      cd ~/Auto-Ledger
                       git pull origin main
-                      docker-compose up -d --build backend
+                      docker compose up -d --build backend
