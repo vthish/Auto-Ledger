@@ -1,0 +1,25 @@
+name: Deploy Backend to AWS
+
+on:
+    push:
+        branches:
+            - main
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout code
+              uses: actions/checkout@v4
+
+            - name: Deploy via SSH
+              uses: appleboy/ssh-action@v1.0.3
+              with:
+                  host: ${{ secrets.AWS_EC2_IP }}
+                  username: ${{ secrets.AWS_USER }}
+                  key: ${{ secrets.AWS_SSH_KEY }}
+                  script: |
+                      cd ~/auto-ledger
+                      git pull origin main
+                      docker-compose up -d --build backend
