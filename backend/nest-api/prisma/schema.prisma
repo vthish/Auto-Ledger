@@ -85,32 +85,40 @@ model User {
 
 model Driving_License {
   license_Id String @id @default(uuid())
-
   license_No String @unique
-
   status License_Status @default(ACTIVE)
-
   image String?
-
   points Int @default(24)
 
-  issue_Date DateTime
+  address String
+  date_of_birth DateTime
+  blood_Group String
 
-  expiry_Date DateTime
+  issue_Date DateTime 
 
   user_Id String @unique
-
   user User @relation(fields: [user_Id], references: [user_Id])
 
   dmt_Admin_Id String
-
   dmtAdmin DMT_Admin @relation(fields: [dmt_Admin_Id], references: [dmt_Admin_Id])
 
   fines Fine[]
-
   temporaryLicenses Temporary_License[]
-
   qrScans QR_Scan_History[]
+
+  vehicleCategories License_Vehicle_Category[]
+}
+
+model License_Vehicle_Category {
+  category_Id String @id @default(uuid())
+  
+  vehicle_Class String 
+  issue_Date DateTime
+  expiry_Date DateTime
+  restriction String? 
+
+  license_Id String
+  license Driving_License @relation(fields: [license_Id], references: [license_Id], onDelete: Cascade)
 }
 
 model Temporary_License {
@@ -217,6 +225,8 @@ model Fine {
   issue_At DateTime @default(now())
 
   due_Date DateTime?
+
+  comment String?
 
   status Fine_Status @default(PENDING)
 

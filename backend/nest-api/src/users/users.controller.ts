@@ -1,51 +1,51 @@
 import {
   Controller,
   Get,
-  Param,
   Patch,
   Body,
-  Delete,
+  Request,
   UseGuards,
 } from '@nestjs/common';
 import { UsersService } from './users.service';
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiBearerAuth,
-  ApiProperty,
-} from '@nestjs/swagger';
+import { IsString, IsNotEmpty } from 'class-validator';
 
-export class UpdateUserDto {
-  @ApiProperty({ example: 'K.V.V. Thishan', required: false })
-  name?: string;
-
-  @ApiProperty({ example: '0771234567', required: false })
-  phoneNumber?: string;
+export interface AuthRequest {
+  user: { id: string };
 }
 
-@ApiTags('Users')
+export class UpdateDeviceDto {
+  @IsString()
+  @IsNotEmpty()
+  deviceId: string;
+}
+
+@ApiTags('Users (Drivers)')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
-  @ApiOperation({ summary: 'Get user by ID' })
-  @Get(':id')
-  async getUserById(@Param('id') id: string) {
-    return this.usersService.getUserById(id);
+  @ApiOperation({ summary: 'Get current logged-in user profile' })
+  @Get('profile')
+  async getProfile(@Request() req: AuthRequest) {
+    return this.usersService.getUserById(req.user.id);
   }
 
-  @ApiOperation({ summary: 'Update user details' })
-  @Patch(':id')
-  async updateUser(@Param('id') id: string, @Body() data: UpdateUserDto) {
-    return this.usersService.updateUser(id, data);
+  @ApiOperation({ summary: 'Update driver device ID' })
+  @Patch('device')
+  async updateDevice(
+    @Request() req: AuthRequest,
+    @Body() data: UpdateDeviceDto,
+  ) {
+    return this.usersService.updateUserDevice(req.user.id, data.deviceId);
   }
 
-  @ApiOperation({ summary: 'Delete a user' })
-  @Delete(':id')
-  async deleteUser(@Param('id') id: string) {
-    return this.usersService.deleteUser(id);
+  @ApiOperation({ summary: 'Verify Phone Number' })
+  @Patch('verify-phone')
+  async verifyPhone(@Request() req: AuthRequest) {
+    return this.usersService.verifyPhone(req.user.id);
   }
 }

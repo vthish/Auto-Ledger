@@ -21,5 +21,21 @@ services:
     ports:
       - "6379:6379"
 
+  # NestJS Backend API
+  backend:
+    build:
+      context: ./backend/nest-api
+      dockerfile: Dockerfile
+    container_name: auto-ledger-backend
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_URL=postgresql://admin:password123@db:5432/auto_ledger_db?schema=public
+      - JWT_SECRET=AutoLedgerSecretKey2026
+    depends_on:
+      - db
+      - redis
+
 volumes:
   postgres_data:
