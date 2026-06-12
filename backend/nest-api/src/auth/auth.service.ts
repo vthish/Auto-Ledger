@@ -8,7 +8,6 @@ import { JwtService } from '@nestjs/jwt';
 import { User, DMT_Admin, Police_Admin } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
-// Register දත්ත වලට අදාළ Type එක මෙතනම හැදුවා (any අයින් කරන්න)
 export interface RegisterData {
   nicNo: string;
   name: string;
@@ -25,7 +24,6 @@ export class AuthService {
   ) {}
 
   async loginAdmin(adminId: string, pass: string, type: 'DMT' | 'POLICE') {
-    // any වෙනුවට නියම Types පාවිච්චි කරලා තියෙනවා
     let admin: DMT_Admin | Police_Admin | null = null;
     let roleName = '';
 
@@ -48,7 +46,6 @@ export class AuthService {
     if (!isPasswordValid)
       throw new UnauthorizedException('Invalid Admin ID or password.');
 
-    // ID එක ගන්නකොට හරියටම Type එක Cast කරලා තියෙනවා
     const adminIdValue =
       type === 'DMT'
         ? (admin as DMT_Admin).dmt_Admin_Id
@@ -131,23 +128,32 @@ export class AuthService {
     };
   }
 
-  // data: any වෙනුවට data: RegisterData කියලා දැම්මා
   async registerUser(data: RegisterData) {
-    const existingUser = await this.prisma.user.findFirst({
-      where: {
-        OR: [{ nic_No: data.nicNo }, { mobile_Phone_No: data.mobilePhoneNo }],
-      },
+    const user = await this.prisma.user.findUnique({
+      where: { nic_No: data.nicNo },
     });
 
-    if (existingUser) {
-      throw new BadRequestException('NIC or Phone Number already exists.');
+    if (!user) {
+      throw new BadRequestException(
+        'Registration Failed: No driving license found for this NIC.',
+      );
+    }
+
+    const license = await this.prisma.driving_License.findUnique({
+      where: { user_Id: user.user_Id },
+    });
+
+    if (!license) {
+      throw new BadRequestException(
+        'Registration Failed: No driving license found for this NIC.',
+      );
     }
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
-    const user = await this.prisma.user.create({
+    const updatedUser = await this.prisma.user.update({
+      where: { nic_No: data.nicNo },
       data: {
-        nic_No: data.nicNo,
         name: data.name,
         mobile_Phone_No: data.mobilePhoneNo,
         password: hashedPassword,
@@ -156,7 +162,7 @@ export class AuthService {
       },
     });
 
-    return this.generateUserToken(user);
+    return this.generateUserToken(updatedUser);
   }
 
   async loginUser(nicNo: string, pass: string, deviceId: string) {

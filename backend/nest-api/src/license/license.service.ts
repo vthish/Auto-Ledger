@@ -31,6 +31,22 @@ export class LicenseService {
   constructor(private prisma: PrismaService) {}
 
   async createLicense(data: CreateLicenseData) {
+    let user = await this.prisma.user.findUnique({
+      where: { nic_No: data.userId },
+    });
+
+    if (!user) {
+      user = await this.prisma.user.create({
+        data: {
+          nic_No: data.userId,
+          name: 'Pending App Registration',
+          password: 'NOT_REGISTERED',
+          mobile_Phone_No: 'PENDING',
+          device_Id: 'PENDING',
+        },
+      });
+    }
+
     return await this.prisma.driving_License.create({
       data: {
         license_No: data.licenseNo,
@@ -38,7 +54,7 @@ export class LicenseService {
         blood_Group: data.bloodGroup,
         date_of_birth: new Date(data.dateOfBirth),
         issue_Date: new Date(data.issueDate),
-        user_Id: data.userId,
+        user_Id: user.user_Id,
         dmt_Admin_Id: data.dmtAdminId,
         image: data.image,
         vehicleCategories: {

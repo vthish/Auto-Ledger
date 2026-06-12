@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Patch,
+  Delete,
   Body,
   Request,
   UseGuards,
@@ -17,11 +18,14 @@ import {
   IsArray,
   IsEnum,
   IsOptional,
+  IsNumber,
+  IsBoolean,
 } from 'class-validator';
 
 export interface AuthRequest {
-  user: { id: string };
+  user: { id: string; role?: string };
 }
+
 export class IssueFineDto {
   @IsString()
   @IsNotEmpty()
@@ -39,6 +43,47 @@ export class IssueFineDto {
 export class CourtVerdictDto {
   @IsEnum(['ACTIVE', 'REVOKED'])
   verdict: 'ACTIVE' | 'REVOKED';
+}
+
+// Police Admin Offense DTOs
+export class CreateOffenseDto {
+  @IsString()
+  @IsNotEmpty()
+  code: string;
+
+  @IsString()
+  @IsNotEmpty()
+  name: string;
+
+  @IsNumber()
+  @IsNotEmpty()
+  points: number;
+
+  @IsNumber()
+  @IsNotEmpty()
+  amount: number;
+
+  @IsBoolean()
+  @IsNotEmpty()
+  isCourtCase: boolean;
+}
+
+export class UpdateOffenseDto {
+  @IsString()
+  @IsOptional()
+  name?: string;
+
+  @IsNumber()
+  @IsOptional()
+  points?: number;
+
+  @IsNumber()
+  @IsOptional()
+  amount?: number;
+
+  @IsBoolean()
+  @IsOptional()
+  isCourtCase?: boolean;
 }
 
 @ApiTags('Fines & Penalties')
@@ -74,5 +119,31 @@ export class FinesController {
     @Body() data: CourtVerdictDto,
   ) {
     return this.finesService.updateCourtCase(fineId, data.verdict);
+  }
+
+  // --- POLICE ADMIN OFFENSE CRUD ROUTES ---
+
+  @ApiOperation({ summary: 'Create Offense Category (Police Admin Only)' })
+  @Post('offense')
+  async createOffenseCategory(
+    @Request() req: AuthRequest,
+    @Body() data: CreateOffenseDto,
+  ) {
+    return this.finesService.createOffenseCategory(data, req.user.id);
+  }
+
+  @ApiOperation({ summary: 'Update Offense Category (Police Admin Only)' })
+  @Patch('offense/:id')
+  async updateOffenseCategory(
+    @Param('id') offenseId: string,
+    @Body() data: UpdateOffenseDto,
+  ) {
+    return this.finesService.updateOffenseCategory(offenseId, data);
+  }
+
+  @ApiOperation({ summary: 'Delete Offense Category (Police Admin Only)' })
+  @Delete('offense/:id')
+  async deleteOffenseCategory(@Param('id') offenseId: string) {
+    return this.finesService.deleteOffenseCategory(offenseId);
   }
 }
