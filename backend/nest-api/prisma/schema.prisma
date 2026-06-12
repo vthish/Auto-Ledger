@@ -7,103 +7,264 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id              String   @id @default(uuid())
-  nic             String   @unique
-  phoneNumber     String   @unique
-  name            String
-  password        String
-  deviceId        String?
-  isPhoneVerified Boolean  @default(false)
-  license         License?
-}
-
-model License {
-  id                     String        @id @default(uuid())
-  licenseNumber          String        @unique
-  issueDate              DateTime      @default(now())
-  expiryDate             DateTime
-  points                 Int           @default(0)
-  status                 LicenseStatus @default(ACTIVE)
-  temporaryLicenseExpiry DateTime?
-
-  userId String @unique
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fines  Fine[]
-}
-
-model District {
-  id            String    @id @default(uuid())
-  name          String    @unique
-  headOfficerId String?   @unique
-  officers      Officer[]
-}
-
-model Officer {
-  id          String      @id @default(uuid())
-  badgeNumber String      @unique
-  name        String
-  password    String
-  role        OfficerRole @default(TRAFFIC_OFFICER)
-
-  districtId  String
-  district    District @relation(fields: [districtId], references: [id])
-  finesIssued Fine[]
-  shifts      Shift[]
-}
-
-model Shift {
-  id        String   @id @default(uuid())
-  startTime DateTime
-  endTime   DateTime
-  isActive  Boolean  @default(true)
-
-  officerId String
-  officer   Officer @relation(fields: [officerId], references: [id], onDelete: Cascade)
-}
-
-model OffenseCategory {
-  id          String   @id @default(uuid())
-  code        String   @unique
-  name        String
-  points      Int
-  isCourtCase Boolean  @default(false)
-  amount      Float    @default(0.0) 
-  fines       Fine[]
-}
-
-model Fine {
-  id        String     @id @default(uuid())
-  issuedAt  DateTime   @default(now())
-  dueDate   DateTime?
-  status    FineStatus @default(PENDING)
-
-  licenseId String
-  license   License @relation(fields: [licenseId], references: [id], onDelete: Cascade)
-
-  officerId String
-  officer   Officer @relation(fields: [officerId], references: [id])
-
-  offenses  OffenseCategory[]
-}
-
-enum LicenseStatus {
+enum License_Status {
   ACTIVE
   SUSPENDED
+  EXPIRED
   REVOKED
-  COURT_PENDING
 }
 
-enum FineStatus {
+enum Fine_Status {
   PENDING
   PAID
   OVERDUE
-  COURT_CASE
-  RESOLVED
 }
 
-enum OfficerRole {
+enum Payment_Status {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum Officer_Role {
   TRAFFIC_OFFICER
   DIVISIONAL_HEAD
-  SYSTEM_ADMIN
+}
+
+model QR_Scan_History {
+  scan_Id              String   @id @default(uuid())
+  qr_Token             String
+  scan_Time            DateTime @default(now())
+
+  traffic_Officer_Name String
+  driver_Name          String
+
+  location             String?
+
+  license_Id           String
+
+  license Driving_License @relation(fields: [license_Id], references: [license_Id])
+}
+
+model DMT_Admin {
+  dmt_Admin_Id String @id @default(uuid())
+
+  name         String
+  password     String
+
+  licenses     Driving_License[]
+}
+
+model Police_Admin {
+  police_Admin_Id String @id @default(uuid())
+
+  name            String
+  password        String
+
+  divisions         Division[]
+  offenseCategories Offence_Category[]
+}
+
+model User {
+  user_Id String @id @default(uuid())
+
+  nic_No String @unique
+
+  mobile_Phone_No String @unique
+
+  device_Id String?
+
+  name String
+
+  password String
+
+  isPhoneVerified Boolean @default(false)
+
+  license Driving_License?
+}
+
+model Driving_License {
+  license_Id String @id @default(uuid())
+  license_No String @unique
+  status License_Status @default(ACTIVE)
+  image String?
+  points Int @default(24)
+
+  address String
+  date_of_birth DateTime
+  blood_Group String
+
+  issue_Date DateTime 
+
+  user_Id String @unique
+  user User @relation(fields: [user_Id], references: [user_Id])
+
+  dmt_Admin_Id String
+  dmtAdmin DMT_Admin @relation(fields: [dmt_Admin_Id], references: [dmt_Admin_Id])
+
+  fines Fine[]
+  temporaryLicenses Temporary_License[]
+  qrScans QR_Scan_History[]
+
+  vehicleCategories License_Vehicle_Category[]
+}
+
+model License_Vehicle_Category {
+  category_Id String @id @default(uuid())
+  
+  vehicle_Class String 
+  issue_Date DateTime
+  expiry_Date DateTime
+  restriction String? 
+
+  license_Id String
+  license Driving_License @relation(fields: [license_Id], references: [license_Id], onDelete: Cascade)
+}
+
+model Temporary_License {
+  temporary_License_Id String @id @default(uuid())
+
+  issue_Date DateTime @default(now())
+
+  expiry_Date DateTime
+
+  license_Id String
+
+  license Driving_License @relation(fields: [license_Id], references: [license_Id])
+}
+
+model Division {
+  division_Id String @id @default(uuid())
+
+  division_Name String @unique
+
+  police_Admin_Id String
+
+  policeAdmin Police_Admin @relation(fields: [police_Admin_Id], references: [police_Admin_Id])
+
+  divisionalHead Divisional_Head?
+}
+
+model Divisional_Head {
+  divisional_Head_Id String @id @default(uuid())
+
+  name String
+
+  role Officer_Role @default(DIVISIONAL_HEAD)
+
+  password String
+
+  division_Id String @unique
+
+  division Division @relation(fields: [division_Id], references: [division_Id])
+
+  officers Traffic_Officer[]
+}
+
+model Traffic_Officer {
+  traffic_Officer_Id String @id @default(uuid())
+
+  badge_No String @unique
+
+  name String
+
+  role Officer_Role @default(TRAFFIC_OFFICER)
+
+  password String
+
+  divisional_Head_Id String
+
+  divisionalHead Divisional_Head @relation(fields: [divisional_Head_Id], references: [divisional_Head_Id])
+
+  shifts Shift[]
+
+  fines Fine[]
+}
+
+model Shift {
+  shift_Id String @id @default(uuid())
+
+  date DateTime
+
+  start_Time DateTime
+
+  end_Time DateTime
+
+  is_Active Boolean @default(true)
+
+  location String?
+
+  traffic_Officer_Id String
+
+  trafficOfficer Traffic_Officer @relation(fields: [traffic_Officer_Id], references: [traffic_Officer_Id])
+}
+
+model Offence_Category {
+  offense_Id String @id @default(uuid())
+
+  code String @unique
+
+  name String
+
+  points_Value Int
+
+  amount Float
+
+  is_Court_Case Boolean @default(false)
+
+  police_Admin_Id String
+
+  policeAdmin Police_Admin @relation(fields: [police_Admin_Id], references: [police_Admin_Id])
+
+  fines Fine_Offence[]
+}
+
+model Fine {
+  fine_Id String @id @default(uuid())
+
+  issue_At DateTime @default(now())
+
+  due_Date DateTime?
+
+  comment String?
+
+  status Fine_Status @default(PENDING)
+
+  license_Id String
+
+  license Driving_License @relation(fields: [license_Id], references: [license_Id])
+
+  traffic_Officer_Id String
+
+  trafficOfficer Traffic_Officer @relation(fields: [traffic_Officer_Id], references: [traffic_Officer_Id])
+
+  offenses Fine_Offence[]
+
+  payment Payment?
+}
+
+model Fine_Offence {
+  fine_Id String
+
+  offense_Id String
+
+  fine Fine @relation(fields: [fine_Id], references: [fine_Id])
+
+  offenceCategory Offence_Category @relation(fields: [offense_Id], references: [offense_Id])
+
+  @@id([fine_Id, offense_Id])
+}
+
+model Payment {
+  payment_Id String @id @default(uuid())
+
+  amount Float
+
+  paidTime DateTime @default(now())
+
+  status Payment_Status @default(COMPLETED)
+
+  fine_Id String @unique
+
+  fine Fine @relation(fields: [fine_Id], references: [fine_Id])
 }

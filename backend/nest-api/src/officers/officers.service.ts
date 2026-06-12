@@ -1,155 +1,86 @@
 import {
   Injectable,
-  BadRequestException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { OfficerRole } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class OfficersService {
   constructor(private prisma: PrismaService) {}
 
-  async registerDivisionalHead(data: {
-    badgeNumber: string;
+  // 1. Create Divisional Head (By Police Admin)
+  async createDivisionalHead(data: {
     name: string;
-    password: string;
-    districtName: string;
+    divisionId: string;
+    passwordStr: string;
   }) {
-    const districtCount = await this.prisma.district.count();
-    let district = await this.prisma.district.findUnique({
-      where: { name: data.districtName },
+    const existingHead = await this.prisma.divisional_Head.findUnique({
+      where: { division_Id: data.divisionId },
     });
+    if (existingHead)
+      throw new BadRequestException('Division already has a head');
 
-    if (!district && districtCount >= 25) {
-      throw new BadRequestException(
-        'Maximum limit of 25 districts reached in Sri Lanka.',
-      );
-    }
+    const hashedPassword = await bcrypt.hash(data.passwordStr, 10);
 
-    if (!district) {
-      district = await this.prisma.district.create({
-        data: { name: data.districtName },
-      });
-    }
-
-    if (district.headOfficerId) {
-      throw new BadRequestException(
-        `District ${data.districtName} already has an assigned Divisional Head.`,
-      );
-    }
-
-    const existingOfficer = await this.prisma.officer.findUnique({
-      where: { badgeNumber: data.badgeNumber },
-    });
-
-    if (existingOfficer) {
-      throw new BadRequestException('Badge number already exists.');
-    }
-
-    const hashedPassword = await bcrypt.hash(data.password, 10);
-
-    const newHead = await this.prisma.officer.create({
+    return this.prisma.divisional_Head.create({
       data: {
-        badgeNumber: data.badgeNumber,
         name: data.name,
+        division_Id: data.divisionId,
         password: hashedPassword,
-        role: OfficerRole.DIVISIONAL_HEAD,
-        districtId: district.id,
+        role: 'DIVISIONAL_HEAD',
       },
     });
-
-    await this.prisma.district.update({
-      where: { id: district.id },
-      data: { headOfficerId: newHead.id },
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...result } = newHead;
-    return result;
   }
 
-  async registerOfficer(data: {
-    badgeNumber: string;
+  // 2. Create Traffic Officer (By Divisional Head)
+  async createTrafficOfficer(data: {
+    badgeNo: string;
     name: string;
-    password: string;
-    districtId: string;
+    passwordStr: string;
+    headId: string;
   }) {
-    const existingOfficer = await this.prisma.officer.findUnique({
-      where: { badgeNumber: data.badgeNumber },
+    const existingOfficer = await this.prisma.traffic_Officer.findUnique({
+      where: { badge_No: data.badgeNo },
     });
+    if (existingOfficer)
+      throw new BadRequestException('Badge number already exists');
 
-    if (existingOfficer) {
-      throw new BadRequestException(
-        'An officer with this badge number already exists.',
-      );
-    }
+    const hashedPassword = await bcrypt.hash(data.passwordStr, 10);
 
-    const district = await this.prisma.district.findUnique({
-      where: { id: data.districtId },
-    });
-
-    if (!district) {
-      throw new NotFoundException(
-        'District not found. Divisional Head must be registered first.',
-      );
-    }
-
-    const hashedPassword = await bcrypt.hash(data.password, 10);
-
-    const newOfficer = await this.prisma.officer.create({
+    return this.prisma.traffic_Officer.create({
       data: {
-        badgeNumber: data.badgeNumber,
+        badge_No: data.badgeNo,
         name: data.name,
         password: hashedPassword,
-        role: OfficerRole.TRAFFIC_OFFICER,
-        districtId: district.id,
+        divisional_Head_Id: data.headId,
+        role: 'TRAFFIC_OFFICER',
       },
     });
-
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...result } = newOfficer;
-    return result;
   }
 
+  // 3. Assign Shift
   async assignShift(data: {
     officerId: string;
-    startTime: string;
-    endTime: string;
+    date: Date;
+    startTime: Date;
+    endTime: Date;
+    location: string;
   }) {
-    const officer = await this.prisma.officer.findUnique({
-      where: { id: data.officerId },
+    const officer = await this.prisma.traffic_Officer.findUnique({
+      where: { traffic_Officer_Id: data.officerId },
     });
-
-    if (!officer) {
-      throw new NotFoundException('Officer not found.');
-    }
-
-    await this.prisma.shift.updateMany({
-      where: { officerId: data.officerId, isActive: true },
-      data: { isActive: false },
-    });
+    if (!officer) throw new NotFoundException('Officer not found');
 
     return this.prisma.shift.create({
       data: {
-        officerId: data.officerId,
-        startTime: new Date(data.startTime),
-        endTime: new Date(data.endTime),
-        isActive: true,
-      },
-    });
-  }
-
-  async getOfficersByDistrict(districtId: string) {
-    return this.prisma.officer.findMany({
-      where: { districtId, role: OfficerRole.TRAFFIC_OFFICER },
-      select: {
-        id: true,
-        badgeNumber: true,
-        name: true,
-        role: true,
-        shifts: { where: { isActive: true } },
+        traffic_Officer_Id: data.officerId,
+        date: data.date,
+        start_Time: data.startTime,
+        end_Time: data.endTime,
+        location: data.location,
+        is_Active: true,
       },
     });
   }
