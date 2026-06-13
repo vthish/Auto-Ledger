@@ -128,7 +128,6 @@ export class UpdateShiftDto {
 export interface OfficerAuthRequest {
   user: {
     id: string;
-    sub: string;
     role: string;
   };
 }
@@ -146,7 +145,8 @@ export class OfficersController {
     @Request() req: OfficerAuthRequest,
     @Body() data: CreateDivisionDto,
   ) {
-    return this.officersService.createDivision(data.divisionName, req.user.sub);
+    // req.user.sub වෙනුවට req.user.id දැම්මා
+    return this.officersService.createDivision(data.divisionName, req.user.id);
   }
 
   @ApiOperation({
@@ -174,7 +174,8 @@ export class OfficersController {
       email: data.email,
       name: data.name,
       passwordStr: data.passwordStr,
-      headId: req.user.sub,
+      // req.user.sub වෙනුවට req.user.id දැම්මා
+      headId: req.user.id,
     });
   }
 
