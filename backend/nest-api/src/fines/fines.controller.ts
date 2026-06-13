@@ -143,6 +143,12 @@ export class FinesController {
     return this.finesService.updateCourtCase(fineId, data.verdict);
   }
 
+  @ApiOperation({ summary: 'Get all Offense Categories (Police Admin Only)' })
+  @Get('offense')
+  async getAllOffenses() {
+    return this.finesService.getAllOffenses();
+  }
+
   @ApiOperation({ summary: 'Create Offense Category (Police Admin Only)' })
   @Post('offense')
   async createOffenseCategory(

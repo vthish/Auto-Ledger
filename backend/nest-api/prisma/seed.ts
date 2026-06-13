@@ -14,16 +14,20 @@ async function main() {
     saltRounds,
   );
 
-  await prisma.dMT_Admin.create({
-    data: {
+  await prisma.dMT_Admin.upsert({
+    where: { username: 'maindmt' },
+    update: {},
+    create: {
       username: 'maindmt',
       name: 'Main DMT Admin',
       password: hashedDmtPassword,
     },
   });
 
-  await prisma.police_Admin.create({
-    data: {
+  await prisma.police_Admin.upsert({
+    where: { username: 'mainpolice' },
+    update: {},
+    create: {
       username: 'mainpolice',
       name: 'Main Police Admin',
       password: hashedPolicePassword,
