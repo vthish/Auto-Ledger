@@ -20,6 +20,7 @@ import {
   Matches,
   IsEnum,
   IsNotEmpty,
+  IsEmail,
 } from 'class-validator';
 
 export class AdminLoginDto {
@@ -183,6 +184,42 @@ export class ResetPasswordDto {
   newPassword: string;
 }
 
+export class HeadForgotResetDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  username: string;
+
+  @ApiProperty()
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(6)
+  newPasswordStr: string;
+}
+
+export class OfficerForgotResetDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  badgeNo: string;
+
+  @ApiProperty()
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(6)
+  newPasswordStr: string;
+}
+
 export interface AuthRequest {
   user: {
     id: string;
@@ -268,6 +305,26 @@ export class AuthController {
       data.nicNo,
       data.mobilePhoneNo,
       data.newPassword,
+    );
+  }
+
+  @ApiOperation({ summary: 'Forgot Password Reset for Divisional Head' })
+  @Post('head/forgot-password')
+  async headForgotPassword(@Body() data: HeadForgotResetDto) {
+    return await this.authService.resetHeadPasswordSelf(
+      data.username,
+      data.email,
+      data.newPasswordStr,
+    );
+  }
+
+  @ApiOperation({ summary: 'Forgot Password Reset for Traffic Officer' })
+  @Post('officer/forgot-password')
+  async officerForgotPassword(@Body() data: OfficerForgotResetDto) {
+    return await this.authService.resetOfficerPasswordSelf(
+      data.badgeNo,
+      data.email,
+      data.newPasswordStr,
     );
   }
 

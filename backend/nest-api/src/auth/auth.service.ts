@@ -89,6 +89,7 @@ export class AuthService {
       user: {
         id: head.divisional_Head_Id,
         name: head.name,
+        email: head.email,
         role: head.role,
         divisionId: head.division_Id,
       },
@@ -133,6 +134,7 @@ export class AuthService {
       user: {
         id: officer.traffic_Officer_Id,
         name: officer.name,
+        email: officer.email,
         role: officer.role,
         badgeNo: officer.badge_No,
       },
@@ -181,6 +183,52 @@ export class AuthService {
     }
 
     return { message: 'Password changed successfully' };
+  }
+
+  async resetHeadPasswordSelf(
+    username: string,
+    email: string,
+    newPasswordStr: string,
+  ) {
+    const head = await this.prisma.divisional_Head.findUnique({
+      where: { username: username },
+    });
+
+    if (!head || head.email !== email) {
+      throw new BadRequestException('Invalid Username or Email provided.');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPasswordStr, 10);
+
+    await this.prisma.divisional_Head.update({
+      where: { username: username },
+      data: { password: hashedPassword },
+    });
+
+    return { message: 'Divisional Head password reset successfully.' };
+  }
+
+  async resetOfficerPasswordSelf(
+    badgeNo: string,
+    email: string,
+    newPasswordStr: string,
+  ) {
+    const officer = await this.prisma.traffic_Officer.findUnique({
+      where: { badge_No: badgeNo },
+    });
+
+    if (!officer || officer.email !== email) {
+      throw new BadRequestException('Invalid Badge Number or Email provided.');
+    }
+
+    const hashedPassword = await bcrypt.hash(newPasswordStr, 10);
+
+    await this.prisma.traffic_Officer.update({
+      where: { badge_No: badgeNo },
+      data: { password: hashedPassword },
+    });
+
+    return { message: 'Traffic Officer password reset successfully.' };
   }
 
   private generateUserToken(user: User) {
