@@ -32,51 +32,55 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async loginAdmin(adminId: string, pass: string, type: 'DMT' | 'POLICE') {
-    let admin: DMT_Admin | Police_Admin | null = null;
+  async loginAdmin(name: string, pass: string, type: 'DMT' | 'POLICE') {
+    let adminObj: DMT_Admin | Police_Admin | null = null;
     let roleName = '';
 
     if (type === 'DMT') {
-      admin = await this.prisma.dMT_Admin.findUnique({
-        where: { dmt_Admin_Id: adminId },
+      // Find the first matching DMT Admin by name
+      adminObj = await this.prisma.dMT_Admin.findFirst({
+        where: { name: name },
       });
       roleName = 'DMT_ADMIN';
     } else {
-      admin = await this.prisma.police_Admin.findUnique({
-        where: { police_Admin_Id: adminId },
+      // Find the first matching Police Admin by name
+      adminObj = await this.prisma.police_Admin.findFirst({
+        where: { name: name },
       });
       roleName = 'POLICE_ADMIN';
     }
 
-    if (!admin)
-      throw new UnauthorizedException('Invalid Admin ID or password.');
+    if (!adminObj)
+      throw new UnauthorizedException('Invalid Admin Name or password.');
 
-    const isPasswordValid = await bcrypt.compare(pass, admin.password);
+    const isPasswordValid = await bcrypt.compare(pass, adminObj.password);
     if (!isPasswordValid)
-      throw new UnauthorizedException('Invalid Admin ID or password.');
+      throw new UnauthorizedException('Invalid Admin Name or password.');
 
     const adminIdValue =
       type === 'DMT'
-        ? (admin as DMT_Admin).dmt_Admin_Id
-        : (admin as Police_Admin).police_Admin_Id;
+        ? (adminObj as DMT_Admin).dmt_Admin_Id
+        : (adminObj as Police_Admin).police_Admin_Id;
 
     const payload = { sub: adminIdValue, role: roleName };
     return {
       accessToken: this.jwtService.sign(payload),
-      user: { id: payload.sub, name: admin.name, role: roleName },
+      user: { id: payload.sub, name: adminObj.name, role: roleName },
     };
   }
 
-  async loginHead(headId: string, pass: string) {
-    const head = await this.prisma.divisional_Head.findUnique({
-      where: { divisional_Head_Id: headId },
+  async loginHead(name: string, pass: string) {
+    // Find the first matching Divisional Head by name
+    const head = await this.prisma.divisional_Head.findFirst({
+      where: { name: name },
     });
 
-    if (!head) throw new UnauthorizedException('Invalid Head ID or password.');
+    if (!head)
+      throw new UnauthorizedException('Invalid Head Name or password.');
 
     const isPasswordValid = await bcrypt.compare(pass, head.password);
     if (!isPasswordValid)
-      throw new UnauthorizedException('Invalid Head ID or password.');
+      throw new UnauthorizedException('Invalid Head Name or password.');
 
     const payload = {
       sub: head.divisional_Head_Id,
@@ -219,18 +223,31 @@ export class AuthService {
 
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
-    const updatedUser = await this.prisma.user.update({
+    await this.prisma.user.update({
       where: { nic_No: data.nicNo },
       data: {
         name: data.name,
         mobile_Phone_No: data.mobilePhoneNo,
         password: hashedPassword,
         device_Id: data.deviceId,
-        isPhoneVerified: true,
+        isPhoneVerified: false,
       },
     });
 
-    return this.generateUserToken(updatedUser);
+    return {
+      message:
+        'User details saved. Please verify phone number via Firebase SMS to complete registration.',
+      success: true,
+    };
+  }
+
+  async verifyRegistration(nicNo: string) {
+    const user = await this.prisma.user.update({
+      where: { nic_No: nicNo },
+      data: { isPhoneVerified: true },
+    });
+
+    return this.generateUserToken(user);
   }
 
   async loginUser(nicNo: string, pass: string, deviceId: string) {
@@ -239,6 +256,12 @@ export class AuthService {
     });
 
     if (!user) throw new UnauthorizedException('Invalid NIC or password.');
+
+    if (!user.isPhoneVerified) {
+      throw new ForbiddenException(
+        'Please verify your phone number using OTP first.',
+      );
+    }
 
     const isPasswordValid = await bcrypt.compare(pass, user.password);
     if (!isPasswordValid)
@@ -263,5 +286,95 @@ export class AuthService {
     });
 
     return this.generateUserToken(user);
+  }
+
+  async biometricLogin(nicNo: string, deviceId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { nic_No: nicNo },
+    });
+
+    if (!user) throw new UnauthorizedException('Invalid user.');
+
+    if (!user.isPhoneVerified) {
+      throw new ForbiddenException(
+        'Please verify your phone number using OTP first.',
+      );
+    }
+
+    if (user.device_Id !== deviceId) {
+      throw new UnauthorizedException(
+        'Biometric Access Denied: Unrecognized device.',
+      );
+    }
+
+    return this.generateUserToken(user);
+  }
+
+  async changeUserPassword(
+    userId: string,
+    dto: { oldPassword: string; newPassword: string },
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { user_Id: userId },
+    });
+
+    if (!user) throw new NotFoundException('User not found');
+
+    const isPasswordValid = await bcrypt.compare(
+      dto.oldPassword,
+      user.password,
+    );
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid old password');
+    }
+
+    const hashedNewPassword = await bcrypt.hash(dto.newPassword, 10);
+
+    await this.prisma.user.update({
+      where: { user_Id: userId },
+      data: { password: hashedNewPassword },
+    });
+
+    return { message: 'User password changed successfully' };
+  }
+
+  async requestPasswordReset(nicNo: string, mobilePhoneNo: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { nic_No: nicNo },
+    });
+
+    if (!user || user.mobile_Phone_No !== mobilePhoneNo) {
+      throw new BadRequestException('Invalid NIC or Mobile Number provided.');
+    }
+
+    return {
+      message: 'NIC and Phone Match. You can proceed to request Firebase SMS.',
+      success: true,
+    };
+  }
+
+  async resetPassword(
+    nicNo: string,
+    mobilePhoneNo: string,
+    newPasswordStr: string,
+  ) {
+    const user = await this.prisma.user.findUnique({
+      where: { nic_No: nicNo },
+    });
+
+    if (!user || user.mobile_Phone_No !== mobilePhoneNo) {
+      throw new BadRequestException('Invalid NIC or Mobile Number provided.');
+    }
+
+    const hashedNewPassword = await bcrypt.hash(newPasswordStr, 10);
+
+    await this.prisma.user.update({
+      where: { nic_No: nicNo },
+      data: { password: hashedNewPassword },
+    });
+
+    return {
+      message: 'Password has been reset successfully. You can now login.',
+    };
   }
 }

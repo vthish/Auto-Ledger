@@ -23,12 +23,12 @@ import {
 } from 'class-validator';
 
 export class AdminLoginDto {
-  @ApiProperty({ example: 'admin-uuid-here' })
+  @ApiProperty({ example: 'Main Police Admin' }) // name is used as username
   @IsString()
   @IsNotEmpty()
-  adminId: string;
+  name: string;
 
-  @ApiProperty({ example: 'DmtAdmin@Password123!' })
+  @ApiProperty({ example: 'PoliceAdmin@Password123!' })
   @IsString()
   @IsNotEmpty()
   password: string;
@@ -39,10 +39,10 @@ export class AdminLoginDto {
 }
 
 export class HeadLoginDto {
-  @ApiProperty({ example: 'head-uuid-here' })
+  @ApiProperty({ example: 'Kamal Perera' }) // name is used as username
   @IsString()
   @IsNotEmpty()
-  headId: string;
+  name: string;
 
   @ApiProperty({ example: 'Head@Pass123!' })
   @IsString()
@@ -65,14 +65,17 @@ export class OfficerLoginDto {
 export class RegisterUserDto {
   @ApiProperty({ example: '200204802139' })
   @IsString()
+  @IsNotEmpty()
   nicNo: string;
 
   @ApiProperty({ example: 'K.V.V. Thishan' })
   @IsString()
+  @IsNotEmpty()
   name: string;
 
-  @ApiProperty({ example: '0771234567' })
+  @ApiProperty({ example: '+94771234567' })
   @IsString()
+  @IsNotEmpty()
   mobilePhoneNo: string;
 
   @ApiProperty({ example: 'Driver@Pass123!' })
@@ -89,30 +92,43 @@ export class RegisterUserDto {
 
   @ApiProperty({ example: 'PHONE-MAC-001' })
   @IsString()
+  @IsNotEmpty()
   deviceId: string;
+}
+
+export class VerifyRegistrationDto {
+  @ApiProperty({ example: '200204802139' })
+  @IsString()
+  @IsNotEmpty()
+  nicNo: string;
 }
 
 export class UserLoginDto {
   @ApiProperty({ example: '200204802139' })
   @IsString()
+  @IsNotEmpty()
   nicNo: string;
 
   @ApiProperty({ example: 'Driver@Pass123!' })
   @IsString()
+  @IsNotEmpty()
   password: string;
 
   @ApiProperty({ example: 'PHONE-MAC-001' })
   @IsString()
+  @IsNotEmpty()
   deviceId: string;
 }
 
 export class VerifyDeviceDto {
   @ApiProperty({ example: '200204802139' })
   @IsString()
+  @IsNotEmpty()
   nicNo: string;
 
   @ApiProperty({ example: 'NEW-PHONE-MAC-002' })
   @IsString()
+  @IsNotEmpty()
   deviceId: string;
 }
 
@@ -126,6 +142,48 @@ export class ChangePasswordDto {
   @IsString()
   @IsNotEmpty()
   @MinLength(6)
+  newPassword: string;
+}
+
+export class BiometricLoginDto {
+  @ApiProperty({ example: '200204802139' })
+  @IsString()
+  @IsNotEmpty()
+  nicNo: string;
+
+  @ApiProperty({ example: 'PHONE-MAC-001' })
+  @IsString()
+  @IsNotEmpty()
+  deviceId: string;
+}
+
+export class ForgotPasswordRequestDto {
+  @ApiProperty({ example: '200204802139' })
+  @IsString()
+  @IsNotEmpty()
+  nicNo: string;
+
+  @ApiProperty({ example: '+94771234567' })
+  @IsString()
+  @IsNotEmpty()
+  mobilePhoneNo: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty({ example: '200204802139' })
+  @IsString()
+  @IsNotEmpty()
+  nicNo: string;
+
+  @ApiProperty({ example: '+94771234567' })
+  @IsString()
+  @IsNotEmpty()
+  mobilePhoneNo: string;
+
+  @ApiProperty({ example: 'NewDriver@Pass123!' })
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(8)
   newPassword: string;
 }
 
@@ -146,7 +204,7 @@ export class AuthController {
   @Post('admin/login')
   async loginAdmin(@Body() data: AdminLoginDto) {
     return await this.authService.loginAdmin(
-      data.adminId,
+      data.name,
       data.password,
       data.type,
     );
@@ -155,7 +213,7 @@ export class AuthController {
   @ApiOperation({ summary: 'Login for Divisional Heads' })
   @Post('head/login')
   async loginHead(@Body() data: HeadLoginDto) {
-    return await this.authService.loginHead(data.headId, data.password);
+    return await this.authService.loginHead(data.name, data.password);
   }
 
   @ApiOperation({ summary: 'Login for Traffic Officers (Restricted to Shift)' })
@@ -164,10 +222,19 @@ export class AuthController {
     return await this.authService.loginOfficer(data.badgeNo, data.password);
   }
 
-  @ApiOperation({ summary: 'Register a new driver' })
+  @ApiOperation({ summary: 'Step 1: Register a new driver' })
   @Post('user/register')
   async registerUser(@Body() data: RegisterUserDto) {
     return await this.authService.registerUser(data);
+  }
+
+  @ApiOperation({
+    summary:
+      'Step 2: Complete Registration (Called after Frontend Firebase Verify)',
+  })
+  @Post('user/verify-registration')
+  async verifyRegistration(@Body() data: VerifyRegistrationDto) {
+    return await this.authService.verifyRegistration(data.nicNo);
   }
 
   @ApiOperation({ summary: 'Login for Drivers' })
@@ -180,10 +247,40 @@ export class AuthController {
     );
   }
 
+  @ApiOperation({ summary: 'Biometric Login for Drivers' })
+  @Post('user/biometric-login')
+  async biometricLogin(@Body() data: BiometricLoginDto) {
+    return await this.authService.biometricLogin(data.nicNo, data.deviceId);
+  }
+
   @ApiOperation({ summary: 'Verify new device with OTP' })
   @Post('user/verify-device')
   async verifyDevice(@Body() data: VerifyDeviceDto) {
     return await this.authService.verifyNewDevice(data.nicNo, data.deviceId);
+  }
+
+  @ApiOperation({
+    summary:
+      'Step 1: Check NIC & Phone before triggering Frontend Firebase OTP',
+  })
+  @Post('user/forgot-password-check')
+  async forgotPasswordRequest(@Body() data: ForgotPasswordRequestDto) {
+    return await this.authService.requestPasswordReset(
+      data.nicNo,
+      data.mobilePhoneNo,
+    );
+  }
+
+  @ApiOperation({
+    summary: 'Step 2: Reset Password (Called after Frontend Firebase Verify)',
+  })
+  @Post('user/reset-password')
+  async resetPassword(@Body() data: ResetPasswordDto) {
+    return await this.authService.resetPassword(
+      data.nicNo,
+      data.mobilePhoneNo,
+      data.newPassword,
+    );
   }
 
   @ApiBearerAuth()
@@ -199,5 +296,16 @@ export class AuthController {
       req.user.role,
       changePasswordDto,
     );
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change Password (User/Driver)' })
+  @UseGuards(JwtAuthGuard)
+  @Patch('user/change-password')
+  async changeUserPassword(
+    @Request() req: AuthRequest,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    return this.authService.changeUserPassword(req.user.sub, changePasswordDto);
   }
 }
