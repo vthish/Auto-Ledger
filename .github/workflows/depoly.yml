@@ -22,5 +22,5 @@ jobs:
                   script: |
                       cd ~/Auto-Ledger
                       git pull origin main
-                      docker exec -i auto-ledger-backend npx prisma db push --accept-data-loss
+                      docker system prune -f
                       docker compose up -d --build backend
