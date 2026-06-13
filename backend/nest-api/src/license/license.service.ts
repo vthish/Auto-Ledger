@@ -88,11 +88,40 @@ export class LicenseService {
   async generateLicenseQR(userId: string) {
     const license = await this.prisma.driving_License.findUnique({
       where: { user_Id: userId },
+      include: {
+        temporaryLicenses: true,
+        fines: { where: { status: 'PENDING' } },
+      },
     });
 
     if (!license) throw new NotFoundException('Active license not found');
-    if (license.status !== 'ACTIVE')
+
+    if (license.status === 'REVOKED' || license.status === 'EXPIRED') {
       throw new BadRequestException(`License is ${license.status}`);
+    }
+
+    if (license.status === 'SUSPENDED') {
+      if (license.temporaryLicenses.length > 0) {
+        const tempLicense = license.temporaryLicenses[0];
+        const now = new Date();
+
+        if (now > new Date(tempLicense.expiry_Date)) {
+          for (const fine of license.fines) {
+            await this.prisma.fine.update({
+              where: { fine_Id: fine.fine_Id },
+              data: { status: 'OVERDUE' },
+            });
+          }
+          throw new BadRequestException(
+            'Temporary license has expired. Auto-escalated to Court Case. QR Code generation blocked.',
+          );
+        }
+      } else {
+        throw new BadRequestException(
+          'License is suspended. QR Code generation blocked.',
+        );
+      }
+    }
 
     const expiryTime = Date.now() + 3 * 60 * 1000;
     const randomToken = crypto.randomBytes(16).toString('hex');

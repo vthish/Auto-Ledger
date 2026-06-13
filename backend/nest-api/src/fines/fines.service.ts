@@ -67,6 +67,16 @@ export class FinesService {
         });
       }
 
+      await tx.driving_License.update({
+        where: { license_Id: data.licenseId },
+        data: {
+          points: {
+            decrement: offenses.reduce((sum, off) => sum + off.points_Value, 0),
+          },
+          status: 'SUSPENDED',
+        },
+      });
+
       if (!isCourtCase) {
         await tx.temporary_License.create({
           data: {
@@ -75,15 +85,6 @@ export class FinesService {
           },
         });
       }
-
-      const totalPoints = offenses.reduce(
-        (sum, off) => sum + off.points_Value,
-        0,
-      );
-      await tx.driving_License.update({
-        where: { license_Id: data.licenseId },
-        data: { points: { decrement: totalPoints } },
-      });
 
       return fine;
     });
@@ -115,6 +116,12 @@ export class FinesService {
     if (fine.status === 'PAID')
       throw new BadRequestException('Fine is already paid');
 
+    if (fine.status === 'OVERDUE') {
+      throw new BadRequestException(
+        'Fine is overdue (Court Case). You cannot pay via the app. Please contact the Divisional Head.',
+      );
+    }
+
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     return this.prisma.$transaction(async (tx) => {
@@ -131,14 +138,22 @@ export class FinesService {
         data: { status: 'PAID' },
       });
 
+      await tx.driving_License.update({
+        where: { license_Id: fine.license_Id },
+        data: { status: 'ACTIVE' },
+      });
+
+      await tx.temporary_License.deleteMany({
+        where: { license_Id: fine.license_Id },
+      });
+
       return {
-        message: `Payment of Rs.${amount} processed successfully via ${paymentMethod}`,
+        message: `Payment of Rs.${amount} via ${paymentMethod} processed successfully. Original License is now ACTIVE.`,
         paymentId: payment.payment_Id,
         fineStatus: updatedFine.status,
       };
     });
   }
-
   async updateCourtCase(fineId: string, verdict: 'ACTIVE' | 'REVOKED') {
     const fine = await this.prisma.fine.findUnique({
       where: { fine_Id: fineId },
