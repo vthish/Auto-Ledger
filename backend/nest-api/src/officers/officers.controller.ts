@@ -1,21 +1,43 @@
-import { Controller, Post, Body, UseGuards } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Patch,
+  Param,
+  Body,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { OfficersService } from './officers.service';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiPropertyOptional,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { IsString, IsNotEmpty, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsDateString,
+  IsOptional,
+} from 'class-validator';
 
-export class CreateHeadDto {
+export class CreateDivisionWithHeadDto {
   @IsString()
   @IsNotEmpty()
-  name: string;
+  divisionName: string;
 
   @IsString()
   @IsNotEmpty()
-  divisionId: string;
+  headUsername: string;
 
   @IsString()
   @IsNotEmpty()
-  passwordStr: string;
+  headName: string;
+
+  @IsString()
+  @IsNotEmpty()
+  headPasswordStr: string;
 }
 
 export class CreateOfficerDto {
@@ -26,10 +48,6 @@ export class CreateOfficerDto {
   @IsString()
   @IsNotEmpty()
   name: string;
-
-  @IsString()
-  @IsNotEmpty()
-  headId: string;
 
   @IsString()
   @IsNotEmpty()
@@ -54,6 +72,36 @@ export class AssignShiftDto {
   location: string;
 }
 
+export class UpdateShiftDto {
+  @ApiPropertyOptional()
+  @IsDateString()
+  @IsOptional()
+  date?: Date;
+
+  @ApiPropertyOptional()
+  @IsDateString()
+  @IsOptional()
+  startTime?: Date;
+
+  @ApiPropertyOptional()
+  @IsDateString()
+  @IsOptional()
+  endTime?: Date;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  location?: string;
+}
+
+export interface OfficerAuthRequest {
+  user: {
+    id: string;
+    sub: string;
+    role: string;
+  };
+}
+
 @ApiTags('Police Management')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
@@ -61,21 +109,47 @@ export class AssignShiftDto {
 export class OfficersController {
   constructor(private readonly officersService: OfficersService) {}
 
-  @ApiOperation({ summary: 'Create Divisional Head (Police Admin Only)' })
-  @Post('head')
-  async createHead(@Body() data: CreateHeadDto) {
-    return this.officersService.createDivisionalHead(data);
+  @ApiOperation({ summary: 'Create Division & Divisional Head (Police Admin)' })
+  @Post('division-and-head')
+  async createDivisionWithHead(
+    @Request() req: OfficerAuthRequest,
+    @Body() data: CreateDivisionWithHeadDto,
+  ) {
+    return this.officersService.createDivisionWithHead(
+      data.divisionName,
+      req.user.sub,
+      data.headUsername,
+      data.headName,
+      data.headPasswordStr,
+    );
   }
 
   @ApiOperation({ summary: 'Create Traffic Officer (Divisional Head Only)' })
   @Post('officer')
-  async createOfficer(@Body() data: CreateOfficerDto) {
-    return this.officersService.createTrafficOfficer(data);
+  async createOfficer(
+    @Request() req: OfficerAuthRequest,
+    @Body() data: CreateOfficerDto,
+  ) {
+    return this.officersService.createTrafficOfficer({
+      badgeNo: data.badgeNo,
+      name: data.name,
+      passwordStr: data.passwordStr,
+      headId: req.user.sub,
+    });
   }
 
   @ApiOperation({ summary: 'Assign Shift to Officer' })
   @Post('shift')
   async assignShift(@Body() data: AssignShiftDto) {
     return this.officersService.assignShift(data);
+  }
+
+  @ApiOperation({ summary: 'Update an existing shift' })
+  @Patch('shift/:id')
+  async updateShift(
+    @Param('id') id: string,
+    @Body() updateShiftDto: UpdateShiftDto,
+  ) {
+    return this.officersService.updateShift(id, updateShiftDto);
   }
 }

@@ -10,7 +10,12 @@ import {
   Param,
 } from '@nestjs/common';
 import { FinesService } from './fines.service';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiProperty,
+} from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import {
   IsString,
@@ -45,7 +50,6 @@ export class CourtVerdictDto {
   verdict: 'ACTIVE' | 'REVOKED';
 }
 
-// Police Admin Offense DTOs
 export class CreateOffenseDto {
   @IsString()
   @IsNotEmpty()
@@ -86,6 +90,18 @@ export class UpdateOffenseDto {
   isCourtCase?: boolean;
 }
 
+export class PayFineDto {
+  @ApiProperty({ example: 5000 })
+  @IsNumber()
+  @IsNotEmpty()
+  amount: number;
+
+  @ApiProperty({ example: 'CREDIT_CARD' })
+  @IsString()
+  @IsNotEmpty()
+  paymentMethod: string;
+}
+
 @ApiTags('Fines & Penalties')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
@@ -110,6 +126,12 @@ export class FinesController {
     return this.finesService.getMyFines(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Pay a Fine (User / Driver)' })
+  @Post(':id/pay')
+  async payFine(@Param('id') fineId: string, @Body() data: PayFineDto) {
+    return this.finesService.payFine(fineId, data.amount, data.paymentMethod);
+  }
+
   @ApiOperation({
     summary: 'Process Court Case Verdict (Divisional Head Only)',
   })
@@ -120,8 +142,6 @@ export class FinesController {
   ) {
     return this.finesService.updateCourtCase(fineId, data.verdict);
   }
-
-  // --- POLICE ADMIN OFFENSE CRUD ROUTES ---
 
   @ApiOperation({ summary: 'Create Offense Category (Police Admin Only)' })
   @Post('offense')

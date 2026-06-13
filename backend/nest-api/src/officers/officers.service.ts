@@ -5,36 +5,55 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
+import { UpdateShiftDto } from './officers.controller';
 
 @Injectable()
 export class OfficersService {
   constructor(private prisma: PrismaService) {}
 
-  // 1. Create Divisional Head (By Police Admin)
-  async createDivisionalHead(data: {
-    name: string;
-    divisionId: string;
-    passwordStr: string;
-  }) {
+  async createDivisionWithHead(
+    divisionName: string,
+    policeAdminId: string,
+    headUsername: string,
+    headName: string,
+    headPasswordStr: string,
+  ) {
+    const existingDivision = await this.prisma.division.findUnique({
+      where: { division_Name: divisionName },
+    });
+    if (existingDivision)
+      throw new BadRequestException('Division name already exists');
+
     const existingHead = await this.prisma.divisional_Head.findUnique({
-      where: { division_Id: data.divisionId },
+      where: { username: headUsername },
     });
     if (existingHead)
-      throw new BadRequestException('Division already has a head');
+      throw new BadRequestException('Head username already exists');
 
-    const hashedPassword = await bcrypt.hash(data.passwordStr, 10);
+    const hashedPassword = await bcrypt.hash(headPasswordStr, 10);
 
-    return this.prisma.divisional_Head.create({
-      data: {
-        name: data.name,
-        division_Id: data.divisionId,
-        password: hashedPassword,
-        role: 'DIVISIONAL_HEAD',
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const division = await tx.division.create({
+        data: {
+          division_Name: divisionName,
+          police_Admin_Id: policeAdminId,
+        },
+      });
+
+      const head = await tx.divisional_Head.create({
+        data: {
+          username: headUsername,
+          name: headName,
+          division_Id: division.division_Id,
+          password: hashedPassword,
+          role: 'DIVISIONAL_HEAD',
+        },
+      });
+
+      return { division, head };
     });
   }
 
-  // 2. Create Traffic Officer (By Divisional Head)
   async createTrafficOfficer(data: {
     badgeNo: string;
     name: string;
@@ -60,7 +79,6 @@ export class OfficersService {
     });
   }
 
-  // 3. Assign Shift
   async assignShift(data: {
     officerId: string;
     date: Date;
@@ -82,6 +100,34 @@ export class OfficersService {
         location: data.location,
         is_Active: true,
       },
+    });
+  }
+
+  async updateShift(shiftId: string, updateShiftDto: UpdateShiftDto) {
+    const shift = await this.prisma.shift.findUnique({
+      where: { shift_Id: shiftId },
+    });
+
+    if (!shift) {
+      throw new NotFoundException('Shift not found');
+    }
+
+    const updateData: {
+      date?: Date;
+      start_Time?: Date;
+      end_Time?: Date;
+      location?: string;
+    } = {};
+
+    if (updateShiftDto.date) updateData.date = updateShiftDto.date;
+    if (updateShiftDto.startTime)
+      updateData.start_Time = updateShiftDto.startTime;
+    if (updateShiftDto.endTime) updateData.end_Time = updateShiftDto.endTime;
+    if (updateShiftDto.location) updateData.location = updateShiftDto.location;
+
+    return this.prisma.shift.update({
+      where: { shift_Id: shiftId },
+      data: updateData,
     });
   }
 }

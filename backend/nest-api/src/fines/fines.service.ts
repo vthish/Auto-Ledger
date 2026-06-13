@@ -106,6 +106,40 @@ export class FinesService {
     });
   }
 
+  async payFine(fineId: string, amount: number, paymentMethod: string) {
+    const fine = await this.prisma.fine.findUnique({
+      where: { fine_Id: fineId },
+    });
+
+    if (!fine) throw new NotFoundException('Fine not found');
+    if (fine.status === 'PAID')
+      throw new BadRequestException('Fine is already paid');
+
+    // Simulate payment gateway delay
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    return this.prisma.$transaction(async (tx) => {
+      const payment = await tx.payment.create({
+        data: {
+          fine_Id: fineId,
+          amount: amount,
+          status: 'COMPLETED',
+        },
+      });
+
+      const updatedFine = await tx.fine.update({
+        where: { fine_Id: fineId },
+        data: { status: 'PAID' },
+      });
+
+      return {
+        message: `Payment of Rs.${amount} processed successfully via ${paymentMethod}`,
+        paymentId: payment.payment_Id,
+        fineStatus: updatedFine.status,
+      };
+    });
+  }
+
   async updateCourtCase(fineId: string, verdict: 'ACTIVE' | 'REVOKED') {
     const fine = await this.prisma.fine.findUnique({
       where: { fine_Id: fineId },
