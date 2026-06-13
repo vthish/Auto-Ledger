@@ -4,8 +4,8 @@ import * as bcrypt from 'bcrypt';
 const prisma = new PrismaClient();
 
 async function main() {
-  const dmtPlainPassword = 'DmtAdmin@Password123!';
-  const policePlainPassword = 'PoliceAdmin@Password123!';
+  const dmtPlainPassword = 'Dmt1234$';
+  const policePlainPassword = 'Poli1234$';
   const saltRounds = 10;
 
   const hashedDmtPassword = await bcrypt.hash(dmtPlainPassword, saltRounds);
