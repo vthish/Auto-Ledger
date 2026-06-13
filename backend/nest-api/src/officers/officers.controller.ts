@@ -20,30 +20,45 @@ import {
   IsNotEmpty,
   IsDateString,
   IsOptional,
+  IsEmail,
 } from 'class-validator';
 
-export class CreateDivisionWithHeadDto {
+export class CreateDivisionDto {
+  @IsString()
+  @IsNotEmpty()
+  divisionName: string;
+}
+
+export class CreateHeadDto {
   @IsString()
   @IsNotEmpty()
   divisionName: string;
 
   @IsString()
   @IsNotEmpty()
-  headUsername: string;
+  username: string;
+
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
 
   @IsString()
   @IsNotEmpty()
-  headName: string;
+  name: string;
 
   @IsString()
   @IsNotEmpty()
-  headPasswordStr: string;
+  passwordStr: string;
 }
 
 export class CreateOfficerDto {
   @IsString()
   @IsNotEmpty()
   badgeNo: string;
+
+  @IsEmail()
+  @IsNotEmpty()
+  email: string;
 
   @IsString()
   @IsNotEmpty()
@@ -109,19 +124,27 @@ export interface OfficerAuthRequest {
 export class OfficersController {
   constructor(private readonly officersService: OfficersService) {}
 
-  @ApiOperation({ summary: 'Create Division & Divisional Head (Police Admin)' })
-  @Post('division-and-head')
-  async createDivisionWithHead(
+  @ApiOperation({ summary: 'Create Division (Police Admin)' })
+  @Post('division')
+  async createDivision(
     @Request() req: OfficerAuthRequest,
-    @Body() data: CreateDivisionWithHeadDto,
+    @Body() data: CreateDivisionDto,
   ) {
-    return this.officersService.createDivisionWithHead(
-      data.divisionName,
-      req.user.sub,
-      data.headUsername,
-      data.headName,
-      data.headPasswordStr,
-    );
+    return this.officersService.createDivision(data.divisionName, req.user.sub);
+  }
+
+  @ApiOperation({
+    summary: 'Assign Divisional Head to Division (Police Admin)',
+  })
+  @Post('head')
+  async createDivisionalHead(@Body() data: CreateHeadDto) {
+    return this.officersService.createDivisionalHead({
+      divisionName: data.divisionName,
+      username: data.username,
+      email: data.email,
+      name: data.name,
+      passwordStr: data.passwordStr,
+    });
   }
 
   @ApiOperation({ summary: 'Create Traffic Officer (Divisional Head Only)' })
@@ -132,6 +155,7 @@ export class OfficersController {
   ) {
     return this.officersService.createTrafficOfficer({
       badgeNo: data.badgeNo,
+      email: data.email,
       name: data.name,
       passwordStr: data.passwordStr,
       headId: req.user.sub,

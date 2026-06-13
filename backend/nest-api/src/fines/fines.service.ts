@@ -115,7 +115,6 @@ export class FinesService {
     if (fine.status === 'PAID')
       throw new BadRequestException('Fine is already paid');
 
-    // Simulate payment gateway delay
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
     return this.prisma.$transaction(async (tx) => {
@@ -159,6 +158,12 @@ export class FinesService {
           points: verdict === 'ACTIVE' ? 24 : 0,
         },
       });
+    });
+  }
+
+  async getAllOffenses() {
+    return this.prisma.offence_Category.findMany({
+      orderBy: { code: 'asc' },
     });
   }
 

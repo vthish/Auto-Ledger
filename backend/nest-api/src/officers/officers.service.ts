@@ -11,66 +11,101 @@ import { UpdateShiftDto } from './officers.controller';
 export class OfficersService {
   constructor(private prisma: PrismaService) {}
 
-  async createDivisionWithHead(
-    divisionName: string,
-    policeAdminId: string,
-    headUsername: string,
-    headName: string,
-    headPasswordStr: string,
-  ) {
+  async createDivision(divisionName: string, policeAdminId: string) {
     const existingDivision = await this.prisma.division.findUnique({
       where: { division_Name: divisionName },
     });
-    if (existingDivision)
+    if (existingDivision) {
       throw new BadRequestException('Division name already exists');
+    }
 
-    const existingHead = await this.prisma.divisional_Head.findUnique({
-      where: { username: headUsername },
+    return this.prisma.division.create({
+      data: {
+        division_Name: divisionName,
+        police_Admin_Id: policeAdminId,
+      },
     });
-    if (existingHead)
+  }
+
+  async createDivisionalHead(data: {
+    divisionName: string;
+    username: string;
+    email: string;
+    name: string;
+    passwordStr: string;
+  }) {
+    const existingDivision = await this.prisma.division.findUnique({
+      where: { division_Name: data.divisionName },
+      include: { divisionalHead: true },
+    });
+
+    if (!existingDivision) {
+      throw new NotFoundException('Division not found');
+    }
+
+    if (existingDivision.divisionalHead) {
+      throw new BadRequestException(
+        'This Division already has a Head assigned',
+      );
+    }
+
+    const existingUsername = await this.prisma.divisional_Head.findUnique({
+      where: { username: data.username },
+    });
+
+    if (existingUsername) {
       throw new BadRequestException('Head username already exists');
+    }
 
-    const hashedPassword = await bcrypt.hash(headPasswordStr, 10);
+    const existingEmail = await this.prisma.divisional_Head.findUnique({
+      where: { email: data.email },
+    });
 
-    return this.prisma.$transaction(async (tx) => {
-      const division = await tx.division.create({
-        data: {
-          division_Name: divisionName,
-          police_Admin_Id: policeAdminId,
-        },
-      });
+    if (existingEmail) {
+      throw new BadRequestException('Head email already exists');
+    }
 
-      const head = await tx.divisional_Head.create({
-        data: {
-          username: headUsername,
-          name: headName,
-          division_Id: division.division_Id,
-          password: hashedPassword,
-          role: 'DIVISIONAL_HEAD',
-        },
-      });
+    const hashedPassword = await bcrypt.hash(data.passwordStr, 10);
 
-      return { division, head };
+    return this.prisma.divisional_Head.create({
+      data: {
+        username: data.username,
+        email: data.email,
+        name: data.name,
+        division_Id: existingDivision.division_Id,
+        password: hashedPassword,
+        role: 'DIVISIONAL_HEAD',
+      },
     });
   }
 
   async createTrafficOfficer(data: {
     badgeNo: string;
+    email: string;
     name: string;
     passwordStr: string;
     headId: string;
   }) {
-    const existingOfficer = await this.prisma.traffic_Officer.findUnique({
+    const existingBadge = await this.prisma.traffic_Officer.findUnique({
       where: { badge_No: data.badgeNo },
     });
-    if (existingOfficer)
+    if (existingBadge) {
       throw new BadRequestException('Badge number already exists');
+    }
+
+    const existingEmail = await this.prisma.traffic_Officer.findUnique({
+      where: { email: data.email },
+    });
+    if (existingEmail) {
+      throw new BadRequestException('Officer email already exists');
+    }
 
     const hashedPassword = await bcrypt.hash(data.passwordStr, 10);
 
     return this.prisma.traffic_Officer.create({
       data: {
         badge_No: data.badgeNo,
+        email: data.email,
         name: data.name,
         password: hashedPassword,
         divisional_Head_Id: data.headId,
