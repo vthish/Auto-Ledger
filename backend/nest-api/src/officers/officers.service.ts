@@ -165,4 +165,16 @@ export class OfficersService {
       data: updateData,
     });
   }
+
+  async getOfficerShifts(officerId: string) {
+    const officer = await this.prisma.traffic_Officer.findUnique({
+      where: { traffic_Officer_Id: officerId },
+    });
+    if (!officer) throw new NotFoundException('Officer not found');
+
+    return this.prisma.shift.findMany({
+      where: { traffic_Officer_Id: officerId },
+      orderBy: { start_Time: 'desc' },
+    });
+  }
 }

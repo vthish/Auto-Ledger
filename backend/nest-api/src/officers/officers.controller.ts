@@ -6,6 +6,7 @@ import {
   Body,
   UseGuards,
   Request,
+  Get,
 } from '@nestjs/common';
 import { OfficersService } from './officers.service';
 import {
@@ -145,7 +146,6 @@ export class OfficersController {
     @Request() req: OfficerAuthRequest,
     @Body() data: CreateDivisionDto,
   ) {
-    // req.user.sub වෙනුවට req.user.id දැම්මා
     return this.officersService.createDivision(data.divisionName, req.user.id);
   }
 
@@ -174,7 +174,6 @@ export class OfficersController {
       email: data.email,
       name: data.name,
       passwordStr: data.passwordStr,
-      // req.user.sub වෙනුවට req.user.id දැම්මා
       headId: req.user.id,
     });
   }
@@ -192,5 +191,11 @@ export class OfficersController {
     @Body() updateShiftDto: UpdateShiftDto,
   ) {
     return this.officersService.updateShift(id, updateShiftDto);
+  }
+
+  @ApiOperation({ summary: 'Get all shifts for a specific officer' })
+  @Get(':id/shifts')
+  async getOfficerShifts(@Param('id') id: string) {
+    return this.officersService.getOfficerShifts(id);
   }
 }
