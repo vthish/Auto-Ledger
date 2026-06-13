@@ -13,6 +13,7 @@ import {
   ApiOperation,
   ApiBearerAuth,
   ApiPropertyOptional,
+  ApiProperty,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import {
@@ -24,86 +25,101 @@ import {
 } from 'class-validator';
 
 export class CreateDivisionDto {
+  @ApiProperty({ example: 'Galle Division' })
   @IsString()
   @IsNotEmpty()
   divisionName: string;
 }
 
 export class CreateHeadDto {
+  @ApiProperty({ example: 'Galle Division' })
   @IsString()
   @IsNotEmpty()
   divisionName: string;
 
+  @ApiProperty({ example: 'kamal_do' })
   @IsString()
   @IsNotEmpty()
   username: string;
 
+  @ApiProperty({ example: 'kamal@police.lk' })
   @IsEmail()
   @IsNotEmpty()
   email: string;
 
+  @ApiProperty({ example: 'Kamal Perera' })
   @IsString()
   @IsNotEmpty()
   name: string;
 
+  @ApiProperty({ example: 'Head@Pass123!' })
   @IsString()
   @IsNotEmpty()
   passwordStr: string;
 }
 
 export class CreateOfficerDto {
+  @ApiProperty({ example: 'TRF-GALLE-001' })
   @IsString()
   @IsNotEmpty()
   badgeNo: string;
 
+  @ApiProperty({ example: 'nimal@police.lk' })
   @IsEmail()
   @IsNotEmpty()
   email: string;
 
+  @ApiProperty({ example: 'Nimal Siripala' })
   @IsString()
   @IsNotEmpty()
   name: string;
 
+  @ApiProperty({ example: 'Officer@Pass123!' })
   @IsString()
   @IsNotEmpty()
   passwordStr: string;
 }
 
 export class AssignShiftDto {
+  @ApiProperty({ example: 'Officer_UUID_Here' })
   @IsString()
   @IsNotEmpty()
   officerId: string;
 
+  @ApiProperty({ example: '2026-06-13' })
   @IsDateString()
   date: Date;
 
+  @ApiProperty({ example: '2026-06-13T06:00:00Z' })
   @IsDateString()
   startTime: Date;
 
+  @ApiProperty({ example: '2026-06-13T14:00:00Z' })
   @IsDateString()
   endTime: Date;
 
+  @ApiProperty({ example: 'Galle Town' })
   @IsString()
   location: string;
 }
 
 export class UpdateShiftDto {
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '2026-06-14' })
   @IsDateString()
   @IsOptional()
   date?: Date;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '2026-06-14T06:00:00Z' })
   @IsDateString()
   @IsOptional()
   startTime?: Date;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: '2026-06-14T14:00:00Z' })
   @IsDateString()
   @IsOptional()
   endTime?: Date;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: 'Colombo' })
   @IsString()
   @IsOptional()
   location?: string;

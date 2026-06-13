@@ -15,6 +15,7 @@ import {
   ApiOperation,
   ApiBearerAuth,
   ApiProperty,
+  ApiPropertyOptional,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import {
@@ -32,59 +33,72 @@ export interface AuthRequest {
 }
 
 export class IssueFineDto {
+  @ApiProperty({ example: 'License_UUID_Here' })
   @IsString()
   @IsNotEmpty()
   licenseId: string;
 
+  @ApiProperty({ example: ['Offense_UUID_1', 'Offense_UUID_2'] })
   @IsArray()
   @IsString({ each: true })
   offenseIds: string[];
 
+  @ApiPropertyOptional({ example: 'Speeding over 80kmph' })
   @IsString()
   @IsOptional()
   comment?: string;
 }
 
 export class CourtVerdictDto {
+  @ApiProperty({ example: 'ACTIVE', enum: ['ACTIVE', 'REVOKED'] })
   @IsEnum(['ACTIVE', 'REVOKED'])
   verdict: 'ACTIVE' | 'REVOKED';
 }
 
 export class CreateOffenseDto {
+  @ApiProperty({ example: 'SPD-001' })
   @IsString()
   @IsNotEmpty()
   code: string;
 
+  @ApiProperty({ example: 'Overspeeding' })
   @IsString()
   @IsNotEmpty()
   name: string;
 
+  @ApiProperty({ example: 3 })
   @IsNumber()
   @IsNotEmpty()
   points: number;
 
+  @ApiProperty({ example: 3000 })
   @IsNumber()
   @IsNotEmpty()
   amount: number;
 
+  @ApiProperty({ example: false })
   @IsBoolean()
   @IsNotEmpty()
   isCourtCase: boolean;
 }
 
 export class UpdateOffenseDto {
+  @ApiPropertyOptional({ example: 'Overspeeding Heavy' })
   @IsString()
   @IsOptional()
   name?: string;
 
+  @ApiPropertyOptional({ example: 4 })
   @IsNumber()
   @IsOptional()
   points?: number;
 
+  @ApiPropertyOptional({ example: 5000 })
   @IsNumber()
   @IsOptional()
   amount?: number;
 
+  @ApiPropertyOptional({ example: true })
   @IsBoolean()
   @IsOptional()
   isCourtCase?: boolean;
