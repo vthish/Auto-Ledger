@@ -5,12 +5,12 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
+import { UpdateShiftDto } from './officers.controller';
 
 @Injectable()
 export class OfficersService {
   constructor(private prisma: PrismaService) {}
 
-  // 1. Create Divisional Head (By Police Admin)
   async createDivisionalHead(data: {
     name: string;
     divisionId: string;
@@ -34,7 +34,6 @@ export class OfficersService {
     });
   }
 
-  // 2. Create Traffic Officer (By Divisional Head)
   async createTrafficOfficer(data: {
     badgeNo: string;
     name: string;
@@ -60,7 +59,6 @@ export class OfficersService {
     });
   }
 
-  // 3. Assign Shift
   async assignShift(data: {
     officerId: string;
     date: Date;
@@ -82,6 +80,34 @@ export class OfficersService {
         location: data.location,
         is_Active: true,
       },
+    });
+  }
+
+  async updateShift(shiftId: string, updateShiftDto: UpdateShiftDto) {
+    const shift = await this.prisma.shift.findUnique({
+      where: { shift_Id: shiftId },
+    });
+
+    if (!shift) {
+      throw new NotFoundException('Shift not found');
+    }
+
+    const updateData: {
+      date?: Date;
+      start_Time?: Date;
+      end_Time?: Date;
+      location?: string;
+    } = {};
+
+    if (updateShiftDto.date) updateData.date = updateShiftDto.date;
+    if (updateShiftDto.startTime)
+      updateData.start_Time = updateShiftDto.startTime;
+    if (updateShiftDto.endTime) updateData.end_Time = updateShiftDto.endTime;
+    if (updateShiftDto.location) updateData.location = updateShiftDto.location;
+
+    return this.prisma.shift.update({
+      where: { shift_Id: shiftId },
+      data: updateData,
     });
   }
 }

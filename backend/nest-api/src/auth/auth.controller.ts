@@ -1,6 +1,19 @@
-import { Controller, Post, Body } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Patch,
+  Body,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { ApiTags, ApiOperation, ApiProperty } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiProperty,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
+import { JwtAuthGuard } from './jwt-auth.guard';
 import {
   IsString,
   MinLength,
@@ -103,12 +116,33 @@ export class VerifyDeviceDto {
   deviceId: string;
 }
 
+export class ChangePasswordDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  oldPassword: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @MinLength(6)
+  newPassword: string;
+}
+
+export interface AuthRequest {
+  user: {
+    id: string;
+    sub: string;
+    role: string;
+  };
+}
+
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
   constructor(private authService: AuthService) {}
 
-  @ApiOperation({ summary: 'Login for DMT & Police Admins (Web Portal)' })
+  @ApiOperation({ summary: 'Login for DMT & Police Admins' })
   @Post('admin/login')
   async loginAdmin(@Body() data: AdminLoginDto) {
     return await this.authService.loginAdmin(
@@ -124,7 +158,7 @@ export class AuthController {
     return await this.authService.loginHead(data.headId, data.password);
   }
 
-  @ApiOperation({ summary: 'Login for Traffic Officers' })
+  @ApiOperation({ summary: 'Login for Traffic Officers (Restricted to Shift)' })
   @Post('officer/login')
   async loginOfficer(@Body() data: OfficerLoginDto) {
     return await this.authService.loginOfficer(data.badgeNo, data.password);
@@ -150,5 +184,20 @@ export class AuthController {
   @Post('user/verify-device')
   async verifyDevice(@Body() data: VerifyDeviceDto) {
     return await this.authService.verifyNewDevice(data.nicNo, data.deviceId);
+  }
+
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Change Password (DO or Officer)' })
+  @UseGuards(JwtAuthGuard)
+  @Patch('change-password')
+  async changePassword(
+    @Request() req: AuthRequest,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(
+      req.user.sub,
+      req.user.role,
+      changePasswordDto,
+    );
   }
 }

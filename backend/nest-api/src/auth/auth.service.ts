@@ -2,11 +2,20 @@ import {
   Injectable,
   UnauthorizedException,
   BadRequestException,
+  NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
-import { User, DMT_Admin, Police_Admin } from '@prisma/client';
+import {
+  User,
+  DMT_Admin,
+  Police_Admin,
+  Divisional_Head,
+  Traffic_Officer,
+} from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { ChangePasswordDto } from './auth.controller';
 
 export interface RegisterData {
   nicNo: string;
@@ -88,6 +97,7 @@ export class AuthService {
   async loginOfficer(badgeNo: string, pass: string) {
     const officer = await this.prisma.traffic_Officer.findUnique({
       where: { badge_No: badgeNo },
+      include: { shifts: true },
     });
 
     if (!officer)
@@ -96,6 +106,20 @@ export class AuthService {
     const isPasswordValid = await bcrypt.compare(pass, officer.password);
     if (!isPasswordValid)
       throw new UnauthorizedException('Invalid Badge Number or password.');
+
+    const now = new Date();
+    const activeShift = officer.shifts.find(
+      (shift) =>
+        shift.is_Active &&
+        new Date(shift.start_Time) <= now &&
+        new Date(shift.end_Time) >= now,
+    );
+
+    if (!activeShift) {
+      throw new ForbiddenException(
+        'Access Denied: You are not within an active shift schedule.',
+      );
+    }
 
     const payload = {
       sub: officer.traffic_Officer_Id,
@@ -112,6 +136,50 @@ export class AuthService {
         badgeNo: officer.badge_No,
       },
     };
+  }
+
+  async changePassword(userId: string, role: string, dto: ChangePasswordDto) {
+    let user: Divisional_Head | Traffic_Officer | null = null;
+
+    if (role === 'DIVISIONAL_HEAD') {
+      user = await this.prisma.divisional_Head.findUnique({
+        where: { divisional_Head_Id: userId },
+      });
+    } else if (role === 'TRAFFIC_OFFICER') {
+      user = await this.prisma.traffic_Officer.findUnique({
+        where: { traffic_Officer_Id: userId },
+      });
+    } else {
+      throw new BadRequestException('Invalid role for password change');
+    }
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      dto.oldPassword,
+      user.password,
+    );
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Invalid old password');
+    }
+
+    const hashedNewPassword = await bcrypt.hash(dto.newPassword, 10);
+
+    if (role === 'DIVISIONAL_HEAD') {
+      await this.prisma.divisional_Head.update({
+        where: { divisional_Head_Id: userId },
+        data: { password: hashedNewPassword },
+      });
+    } else {
+      await this.prisma.traffic_Officer.update({
+        where: { traffic_Officer_Id: userId },
+        data: { password: hashedNewPassword },
+      });
+    }
+
+    return { message: 'Password changed successfully' };
   }
 
   private generateUserToken(user: User) {
