@@ -5,6 +5,7 @@ import {
   Param,
   Body,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { OfficersService } from './officers.service';
 import {
@@ -21,18 +22,22 @@ import {
   IsOptional,
 } from 'class-validator';
 
-export class CreateHeadDto {
+export class CreateDivisionWithHeadDto {
   @IsString()
   @IsNotEmpty()
-  name: string;
+  divisionName: string;
 
   @IsString()
   @IsNotEmpty()
-  divisionId: string;
+  headUsername: string;
 
   @IsString()
   @IsNotEmpty()
-  passwordStr: string;
+  headName: string;
+
+  @IsString()
+  @IsNotEmpty()
+  headPasswordStr: string;
 }
 
 export class CreateOfficerDto {
@@ -43,10 +48,6 @@ export class CreateOfficerDto {
   @IsString()
   @IsNotEmpty()
   name: string;
-
-  @IsString()
-  @IsNotEmpty()
-  headId: string;
 
   @IsString()
   @IsNotEmpty()
@@ -93,6 +94,14 @@ export class UpdateShiftDto {
   location?: string;
 }
 
+export interface OfficerAuthRequest {
+  user: {
+    id: string;
+    sub: string;
+    role: string;
+  };
+}
+
 @ApiTags('Police Management')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
@@ -100,16 +109,33 @@ export class UpdateShiftDto {
 export class OfficersController {
   constructor(private readonly officersService: OfficersService) {}
 
-  @ApiOperation({ summary: 'Create Divisional Head' })
-  @Post('head')
-  async createHead(@Body() data: CreateHeadDto) {
-    return this.officersService.createDivisionalHead(data);
+  @ApiOperation({ summary: 'Create Division & Divisional Head (Police Admin)' })
+  @Post('division-and-head')
+  async createDivisionWithHead(
+    @Request() req: OfficerAuthRequest,
+    @Body() data: CreateDivisionWithHeadDto,
+  ) {
+    return this.officersService.createDivisionWithHead(
+      data.divisionName,
+      req.user.sub,
+      data.headUsername,
+      data.headName,
+      data.headPasswordStr,
+    );
   }
 
-  @ApiOperation({ summary: 'Create Traffic Officer' })
+  @ApiOperation({ summary: 'Create Traffic Officer (Divisional Head Only)' })
   @Post('officer')
-  async createOfficer(@Body() data: CreateOfficerDto) {
-    return this.officersService.createTrafficOfficer(data);
+  async createOfficer(
+    @Request() req: OfficerAuthRequest,
+    @Body() data: CreateOfficerDto,
+  ) {
+    return this.officersService.createTrafficOfficer({
+      badgeNo: data.badgeNo,
+      name: data.name,
+      passwordStr: data.passwordStr,
+      headId: req.user.sub,
+    });
   }
 
   @ApiOperation({ summary: 'Assign Shift to Officer' })

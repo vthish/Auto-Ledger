@@ -23,10 +23,10 @@ import {
 } from 'class-validator';
 
 export class AdminLoginDto {
-  @ApiProperty({ example: 'Main Police Admin' }) // name is used as username
+  @ApiProperty({ example: 'mainpolice' })
   @IsString()
   @IsNotEmpty()
-  name: string;
+  username: string;
 
   @ApiProperty({ example: 'PoliceAdmin@Password123!' })
   @IsString()
@@ -39,10 +39,10 @@ export class AdminLoginDto {
 }
 
 export class HeadLoginDto {
-  @ApiProperty({ example: 'Kamal Perera' }) // name is used as username
+  @ApiProperty({ example: 'kamal_do' })
   @IsString()
   @IsNotEmpty()
-  name: string;
+  username: string;
 
   @ApiProperty({ example: 'Head@Pass123!' })
   @IsString()
@@ -80,13 +80,9 @@ export class RegisterUserDto {
 
   @ApiProperty({ example: 'Driver@Pass123!' })
   @IsString()
-  @MinLength(8, { message: 'Password must be at least 8 characters long.' })
+  @MinLength(8)
   @Matches(
     /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
-    {
-      message:
-        'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character.',
-    },
   )
   password: string;
 
@@ -204,7 +200,7 @@ export class AuthController {
   @Post('admin/login')
   async loginAdmin(@Body() data: AdminLoginDto) {
     return await this.authService.loginAdmin(
-      data.name,
+      data.username,
       data.password,
       data.type,
     );
@@ -213,10 +209,10 @@ export class AuthController {
   @ApiOperation({ summary: 'Login for Divisional Heads' })
   @Post('head/login')
   async loginHead(@Body() data: HeadLoginDto) {
-    return await this.authService.loginHead(data.name, data.password);
+    return await this.authService.loginHead(data.username, data.password);
   }
 
-  @ApiOperation({ summary: 'Login for Traffic Officers (Restricted to Shift)' })
+  @ApiOperation({ summary: 'Login for Traffic Officers' })
   @Post('officer/login')
   async loginOfficer(@Body() data: OfficerLoginDto) {
     return await this.authService.loginOfficer(data.badgeNo, data.password);
@@ -228,10 +224,7 @@ export class AuthController {
     return await this.authService.registerUser(data);
   }
 
-  @ApiOperation({
-    summary:
-      'Step 2: Complete Registration (Called after Frontend Firebase Verify)',
-  })
+  @ApiOperation({ summary: 'Step 2: Complete Registration' })
   @Post('user/verify-registration')
   async verifyRegistration(@Body() data: VerifyRegistrationDto) {
     return await this.authService.verifyRegistration(data.nicNo);
@@ -259,10 +252,7 @@ export class AuthController {
     return await this.authService.verifyNewDevice(data.nicNo, data.deviceId);
   }
 
-  @ApiOperation({
-    summary:
-      'Step 1: Check NIC & Phone before triggering Frontend Firebase OTP',
-  })
+  @ApiOperation({ summary: 'Step 1: Check NIC & Phone' })
   @Post('user/forgot-password-check')
   async forgotPasswordRequest(@Body() data: ForgotPasswordRequestDto) {
     return await this.authService.requestPasswordReset(
@@ -271,9 +261,7 @@ export class AuthController {
     );
   }
 
-  @ApiOperation({
-    summary: 'Step 2: Reset Password (Called after Frontend Firebase Verify)',
-  })
+  @ApiOperation({ summary: 'Step 2: Reset Password' })
   @Post('user/reset-password')
   async resetPassword(@Body() data: ResetPasswordDto) {
     return await this.authService.resetPassword(

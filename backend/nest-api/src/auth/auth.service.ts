@@ -32,30 +32,28 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async loginAdmin(name: string, pass: string, type: 'DMT' | 'POLICE') {
+  async loginAdmin(username: string, pass: string, type: 'DMT' | 'POLICE') {
     let adminObj: DMT_Admin | Police_Admin | null = null;
     let roleName = '';
 
     if (type === 'DMT') {
-      // Find the first matching DMT Admin by name
-      adminObj = await this.prisma.dMT_Admin.findFirst({
-        where: { name: name },
+      adminObj = await this.prisma.dMT_Admin.findUnique({
+        where: { username: username },
       });
       roleName = 'DMT_ADMIN';
     } else {
-      // Find the first matching Police Admin by name
-      adminObj = await this.prisma.police_Admin.findFirst({
-        where: { name: name },
+      adminObj = await this.prisma.police_Admin.findUnique({
+        where: { username: username },
       });
       roleName = 'POLICE_ADMIN';
     }
 
     if (!adminObj)
-      throw new UnauthorizedException('Invalid Admin Name or password.');
+      throw new UnauthorizedException('Invalid Admin Username or password.');
 
     const isPasswordValid = await bcrypt.compare(pass, adminObj.password);
     if (!isPasswordValid)
-      throw new UnauthorizedException('Invalid Admin Name or password.');
+      throw new UnauthorizedException('Invalid Admin Username or password.');
 
     const adminIdValue =
       type === 'DMT'
@@ -69,18 +67,17 @@ export class AuthService {
     };
   }
 
-  async loginHead(name: string, pass: string) {
-    // Find the first matching Divisional Head by name
-    const head = await this.prisma.divisional_Head.findFirst({
-      where: { name: name },
+  async loginHead(username: string, pass: string) {
+    const head = await this.prisma.divisional_Head.findUnique({
+      where: { username: username },
     });
 
     if (!head)
-      throw new UnauthorizedException('Invalid Head Name or password.');
+      throw new UnauthorizedException('Invalid Head Username or password.');
 
     const isPasswordValid = await bcrypt.compare(pass, head.password);
     if (!isPasswordValid)
-      throw new UnauthorizedException('Invalid Head Name or password.');
+      throw new UnauthorizedException('Invalid Head Username or password.');
 
     const payload = {
       sub: head.divisional_Head_Id,
@@ -235,8 +232,7 @@ export class AuthService {
     });
 
     return {
-      message:
-        'User details saved. Please verify phone number via Firebase SMS to complete registration.',
+      message: 'User details saved. Please verify phone number.',
       success: true,
     };
   }
@@ -348,7 +344,7 @@ export class AuthService {
     }
 
     return {
-      message: 'NIC and Phone Match. You can proceed to request Firebase SMS.',
+      message: 'NIC and Phone Match.',
       success: true,
     };
   }

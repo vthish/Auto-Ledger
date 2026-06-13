@@ -11,26 +11,46 @@ import { UpdateShiftDto } from './officers.controller';
 export class OfficersService {
   constructor(private prisma: PrismaService) {}
 
-  async createDivisionalHead(data: {
-    name: string;
-    divisionId: string;
-    passwordStr: string;
-  }) {
+  async createDivisionWithHead(
+    divisionName: string,
+    policeAdminId: string,
+    headUsername: string,
+    headName: string,
+    headPasswordStr: string,
+  ) {
+    const existingDivision = await this.prisma.division.findUnique({
+      where: { division_Name: divisionName },
+    });
+    if (existingDivision)
+      throw new BadRequestException('Division name already exists');
+
     const existingHead = await this.prisma.divisional_Head.findUnique({
-      where: { division_Id: data.divisionId },
+      where: { username: headUsername },
     });
     if (existingHead)
-      throw new BadRequestException('Division already has a head');
+      throw new BadRequestException('Head username already exists');
 
-    const hashedPassword = await bcrypt.hash(data.passwordStr, 10);
+    const hashedPassword = await bcrypt.hash(headPasswordStr, 10);
 
-    return this.prisma.divisional_Head.create({
-      data: {
-        name: data.name,
-        division_Id: data.divisionId,
-        password: hashedPassword,
-        role: 'DIVISIONAL_HEAD',
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const division = await tx.division.create({
+        data: {
+          division_Name: divisionName,
+          police_Admin_Id: policeAdminId,
+        },
+      });
+
+      const head = await tx.divisional_Head.create({
+        data: {
+          username: headUsername,
+          name: headName,
+          division_Id: division.division_Id,
+          password: hashedPassword,
+          role: 'DIVISIONAL_HEAD',
+        },
+      });
+
+      return { division, head };
     });
   }
 
