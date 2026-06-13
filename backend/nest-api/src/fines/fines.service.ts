@@ -118,7 +118,7 @@ export class FinesService {
 
     if (fine.status === 'OVERDUE') {
       throw new BadRequestException(
-        'Fine is overdue (Court Case). You cannot pay via the app. Please contact the Divisional Head.',
+        'Fine is overdue (Court Case). You cannot pay via the app.',
       );
     }
 
@@ -148,12 +148,77 @@ export class FinesService {
       });
 
       return {
-        message: `Payment of Rs.${amount} via ${paymentMethod} processed successfully. Original License is now ACTIVE.`,
+        message: `Payment of Rs.${amount} via ${paymentMethod} processed successfully.`,
         paymentId: payment.payment_Id,
         fineStatus: updatedFine.status,
       };
     });
   }
+
+  async payBulkFines(
+    fineIds: string[],
+    totalAmount: number,
+    paymentMethod: string,
+  ) {
+    const fines = await this.prisma.fine.findMany({
+      where: { fine_Id: { in: fineIds } },
+    });
+
+    if (fines.length !== fineIds.length) {
+      throw new BadRequestException('One or more fines not found');
+    }
+
+    for (const fine of fines) {
+      if (fine.status === 'PAID')
+        throw new BadRequestException(`Fine ${fine.fine_Id} is already paid`);
+      if (fine.status === 'OVERDUE')
+        throw new BadRequestException(
+          `Fine ${fine.fine_Id} is overdue (Court Case). Cannot pay via app.`,
+        );
+    }
+
+    const licenseId = fines[0].license_Id;
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    return this.prisma.$transaction(async (tx) => {
+      const payments: { payment_Id: string }[] = [];
+
+      for (const fineId of fineIds) {
+        const paymentAmount = totalAmount / fineIds.length;
+
+        const payment = await tx.payment.create({
+          data: {
+            fine_Id: fineId,
+            amount: paymentAmount,
+            status: 'COMPLETED',
+          },
+        });
+        payments.push(payment);
+
+        await tx.fine.update({
+          where: { fine_Id: fineId },
+          data: { status: 'PAID' },
+        });
+      }
+
+      await tx.driving_License.update({
+        where: { license_Id: licenseId },
+        data: { status: 'ACTIVE' },
+      });
+
+      await tx.temporary_License.deleteMany({
+        where: { license_Id: licenseId },
+      });
+
+      return {
+        message: `Bulk payment of Rs.${totalAmount} via ${paymentMethod} processed successfully. Original License is now ACTIVE.`,
+        paidFinesCount: fineIds.length,
+        payments: payments.map((p) => p.payment_Id),
+      };
+    });
+  }
+
   async updateCourtCase(fineId: string, verdict: 'ACTIVE' | 'REVOKED') {
     const fine = await this.prisma.fine.findUnique({
       where: { fine_Id: fineId },
