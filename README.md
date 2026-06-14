@@ -1,60 +1,46 @@
-🚦 Auto-Ledger 📱
+# 🚦 Auto-Ledger 📱  
+### Smart Digital Driving License & Penalty Points System (Sri Lanka)
 
-An enterprise-level Smart Digital Driving License and Penalty Points System for Sri Lanka.
+An **enterprise-level full-stack system** designed for managing digital driving licenses, traffic violations, and penalty points tracking in Sri Lanka.
 
-Developed as the Final Year Project for HND in Software Engineering.
+This project is developed as the **Final Year HND in Software Engineering project**.
 
-🏛 Architecture (Monorepo)
+---
 
-Component
+## ✨ Overview
 
-Technology Stack
+Auto-Ledger is a **multi-platform ecosystem** consisting of:
 
-📱 Frontend
+- 👨‍✈️ Driver Mobile App  
+- 🚓 Police Mobile App  
+- 🖥️ Admin Web Portal (DMT Admin + Police Admin)  
+- ⚙️ Secure Backend API  
+- 🗄️ Scalable Database Infrastructure  
 
-Flutter & Dart (Driver App & Police Enforcement App)
+---
 
-⚙️ Backend
+## 🏛️ System Architecture (Monorepo)
 
-Nest.js (TypeScript) API
+| Component | Technology |
+|----------|------------|
+| 📱 Mobile Frontend | Flutter & Dart (Driver App + Police App) |
+| 🖥️ Web Frontend | React.js with Next.js (Admin Panels) |
+| ⚙️ Backend | NestJS (TypeScript REST API) |
+| 🗄️ Database | PostgreSQL (Neon / AWS RDS) |
+| ⚡ Cache | Redis (Upstash) |
+| 🐳 Infrastructure | Docker & Docker Compose |
 
-🗄️ Database
+---
 
-PostgreSQL (Neon.tech / AWS RDS)
+## 📂 Repository Structure
 
-⚡ Caching
-
-Redis (Upstash)
-
-🐳 Infrastructure
-
-Docker Containerization
-
-📂 Repository Structure
-
+```bash
 📦 Auto-Ledger-App
  ┣ 📂 frontend_apps
- ┃ ┣ 📂 AutoLedger         # Driver Mobile Application
- ┃ ┗ 📂 AutoLedgerPolice   # Police Enforcement Mobile Application
+ ┃ ┣ 📂 AutoLedger              # Driver Mobile App (Flutter)
+ ┃ ┣ 📂 AutoLedgerPolice        # Police Mobile App (Flutter)
+ ┃ ┣ 📂 DMT_Admin               # DMT Admin Web Portal (Next.js)
+ ┃ ┗ 📂 Police_Admin            # Police Admin Web Portal (Next.js)
  ┣ 📂 backend
- ┃ ┗ 📂 nest-api           # Main Backend API
- ┗ 📜 docker-compose.yml   # Local database & caching infrastructure
-
-
-🚀 Live Deployment
-
-🌍 Main API Base URL: http://47.129.144.60:3000
-
-📖 Swagger API Docs: http://47.129.144.60:3000/api-doc
-
-Note: Ensure you are connecting to the correct port depending on your local or production environment.
-
-🤝 Development Team
-
-👨‍💻 Venusha Thishan
-
-👩‍💻 Thiloka Indhuwari
-
-👩‍💻 Maheema Vihangi
-
-👨‍💻 Chamira Hashan
+ ┃ ┗ 📂 nest-api                # NestJS Backend API
+ ┗ 📜 docker-compose.yml        # Local infrastructure (DB + Redis)
