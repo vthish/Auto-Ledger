@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Users, Calendar, MapPin, CreditCard, ShieldCheck, Droplet, Edit, Trash2, Save, X, Car, Bike, Truck, Bus, Tractor } from 'lucide-react';
+import { Users, CreditCard, ShieldCheck, Edit, Trash2, Save, X, Car, Bike, Truck, Bus, Tractor, Accessibility } from 'lucide-react';
 
 export default function ManageLicensesPage() {
   const [drivers, setDrivers] = useState([
@@ -17,16 +17,23 @@ export default function ManageLicensesPage() {
   
   const [editingId, setEditingId] = useState<number | null>(null);
 
+  // Aluth Image ekata anuwa Categories 15 ma methana thiyenawa
   const vehicleCategories = [
     { class: 'A1', desc: 'Light Motor Cycles', icon: <Bike size={16}/> },
     { class: 'A', desc: 'Motor Cycles', icon: <Bike size={16}/> },
     { class: 'B1', desc: 'Motor Tricycles', icon: <Car size={16}/> },
     { class: 'B', desc: 'Dual Purpose Vehicles', icon: <Car size={16}/> },
+    { class: 'B2', desc: 'Light Motor Vehicles', icon: <Car size={16}/> },
     { class: 'C1', desc: 'Light Motor Lorry', icon: <Truck size={16}/> },
     { class: 'C', desc: 'Motor Lorry', icon: <Truck size={16}/> },
+    { class: 'CE', desc: 'Heavy Motor Lorry', icon: <Truck size={16}/> },
     { class: 'D1', desc: 'Light Motor Coach', icon: <Bus size={16}/> },
     { class: 'D', desc: 'Motor Coach', icon: <Bus size={16}/> },
+    { class: 'DE', desc: 'Heavy Motor Coach', icon: <Bus size={16}/> },
     { class: 'G1', desc: 'Land Tractor', icon: <Tractor size={16}/> },
+    { class: 'G', desc: 'Tractor with Trailer', icon: <Tractor size={16}/> },
+    { class: 'J', desc: 'Special Purpose Vehicle', icon: <Truck size={16}/> },
+    { class: 'H', desc: 'Invalid Carriages', icon: <Accessibility size={16}/> },
   ];
 
   const handleCategoryChange = (catClass: string, field: string, value: any) => {
@@ -128,10 +135,10 @@ export default function ManageLicensesPage() {
           </div>
         </div>
 
-        {/* Section 3: Vehicle Categories */}
+        {/* Section 3: Vehicle Categories (15 Categories) */}
         <div className="mt-8 pt-6 border-t border-red-900/30">
           <h4 className="text-sm font-bold text-slate-300 uppercase tracking-widest mb-4 flex items-center"><Car size={16} className="mr-2 text-red-500"/> Allowed Vehicle Categories</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {vehicleCategories.map((cat) => {
               const catData = formData.categories[cat.class] || {};
               const isChecked = catData.checked || false;
