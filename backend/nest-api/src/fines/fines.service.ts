@@ -19,6 +19,17 @@ export interface UpdateOffenseData {
   isCourtCase?: boolean;
 }
 
+interface PaymentResult {
+  message: string;
+  paymentId: string;
+  fineStatus: string;
+}
+
+interface BulkPaymentResult {
+  message: string;
+  payments: string[];
+}
+
 @Injectable()
 export class FinesService {
   constructor(private prisma: PrismaService) {}
@@ -103,7 +114,7 @@ export class FinesService {
     });
   }
 
-  async payFine(fineId: string, amount: number, paymentMethod: string) {
+  async payFine(fineId: string, amount: number): Promise<PaymentResult> {
     const fine = await this.prisma.fine.findUnique({
       where: { fine_Id: fineId },
     });
@@ -142,11 +153,11 @@ export class FinesService {
   async payBulkFines(
     fineIds: string[],
     totalAmount: number,
-    paymentMethod: string,
-  ) {
+  ): Promise<BulkPaymentResult> {
     const fines = await this.prisma.fine.findMany({
       where: { fine_Id: { in: fineIds } },
     });
+
     if (fines.length !== fineIds.length)
       throw new BadRequestException('Some fines not found');
 
@@ -158,8 +169,10 @@ export class FinesService {
     }
 
     const licenseId = fines[0].license_Id;
+
     return this.prisma.$transaction(async (tx) => {
-      const payments = [];
+      const paymentIds: string[] = [];
+
       for (const fineId of fineIds) {
         const p = await tx.payment.create({
           data: {
@@ -168,22 +181,27 @@ export class FinesService {
             status: 'COMPLETED',
           },
         });
-        payments.push(p);
+
+        paymentIds.push(p.payment_Id);
+
         await tx.fine.update({
           where: { fine_Id: fineId },
           data: { status: 'PAID' },
         });
       }
+
       await tx.driving_License.update({
         where: { license_Id: licenseId },
         data: { status: 'ACTIVE' },
       });
+
       await tx.temporary_License.deleteMany({
         where: { license_Id: licenseId },
       });
+
       return {
         message: 'Bulk payment successful',
-        payments: payments.map((p) => p.payment_Id),
+        payments: paymentIds,
       };
     });
   }

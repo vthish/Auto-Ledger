@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { UpdateShiftDto } from './officers.controller';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class OfficersService {
@@ -134,7 +135,7 @@ export class OfficersService {
     });
     if (!shift) throw new NotFoundException('Shift not found');
 
-    const updateData: any = {};
+    const updateData: Prisma.ShiftUpdateInput = {};
     if (updateShiftDto.date) updateData.date = updateShiftDto.date;
     if (updateShiftDto.startTime)
       updateData.start_Time = updateShiftDto.startTime;
@@ -160,7 +161,9 @@ export class OfficersService {
   }
 
   async getDivisionOfficers(headId: string, search?: string) {
-    const whereClause: any = { divisional_Head_Id: headId };
+    const whereClause: Prisma.Traffic_OfficerWhereInput = {
+      divisional_Head_Id: headId,
+    };
 
     if (search) {
       whereClause.OR = [

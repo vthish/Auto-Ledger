@@ -12,7 +12,6 @@ import {
 import { OfficersService } from './officers.service';
 import {
   ApiTags,
-  ApiOperation,
   ApiBearerAuth,
   ApiPropertyOptional,
   ApiProperty,
@@ -27,6 +26,16 @@ import {
   IsOptional,
   IsEmail,
 } from 'class-validator';
+import { Request as ExpressRequest } from 'express';
+
+interface UserPayload {
+  id: string;
+  role: string;
+}
+
+interface RequestWithUser extends ExpressRequest {
+  user: UserPayload;
+}
 
 export class CreateDivisionDto {
   @ApiProperty() @IsString() @IsNotEmpty() divisionName: string;
@@ -67,7 +76,10 @@ export class OfficersController {
 
   @Roles('POLICE_ADMIN')
   @Post('division')
-  async createDivision(@Request() req: any, @Body() data: CreateDivisionDto) {
+  async createDivision(
+    @Request() req: RequestWithUser,
+    @Body() data: CreateDivisionDto,
+  ) {
     return this.officersService.createDivision(data.divisionName, req.user.id);
   }
 
@@ -79,7 +91,10 @@ export class OfficersController {
 
   @Roles('DIVISIONAL_HEAD')
   @Post('officer')
-  async createOfficer(@Request() req: any, @Body() data: CreateOfficerDto) {
+  async createOfficer(
+    @Request() req: RequestWithUser,
+    @Body() data: CreateOfficerDto,
+  ) {
     return this.officersService.createTrafficOfficer({
       ...data,
       headId: req.user.id,
@@ -104,7 +119,7 @@ export class OfficersController {
   @Roles('DIVISIONAL_HEAD')
   @Get('my-division')
   async getMyDivisionOfficers(
-    @Request() req: any,
+    @Request() req: RequestWithUser,
     @Query('search') search?: string,
   ) {
     return this.officersService.getDivisionOfficers(req.user.id, search);
