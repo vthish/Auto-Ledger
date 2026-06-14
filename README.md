@@ -7,7 +7,7 @@ Developed as the Final Year Project for HND in Software Engineering.
 
 - **Frontend:** Flutter & Dart (Driver App & Police Enforcement App)
 - **Backend:** Nest.js (TypeScript) API
-- **Database:** PostgreSQL (Neon.tech)
+- **Database:** PostgreSQL (Neon.tech / AWS RDS)
 - **Caching & Real-time:** Redis (Upstash)
 - **Infrastructure:** Docker Containerization
 
@@ -20,14 +20,16 @@ Developed as the Final Year Project for HND in Software Engineering.
 
 ## 🚀 Live Deployment
 
-![Hosted on Render](https://img.shields.io/badge/Hosted_on-Render-46E3B7?style=for-the-badge&logo=render&logoColor=white)
+![Hosted on AWS](https://img.shields.io/badge/Hosted_on-AWS-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white)
 
-* **Main API Base URL:** [https://auto-ledger-api.onrender.com](https://auto-ledger-api.onrender.com)
-* **Mock DMT API:** [https://auto-ledger-mock-dmt-yv7q.onrender.com](https://auto-ledger-mock-dmt-yv7q.onrender.com)
+* **Main API Base URL:** [http://3.109.130.13:3000](http://3.109.130.13:3000)
+* **Swagger API Documentation:** [http://3.109.130.13:3000/api](http://3.109.130.13:3000/api)
+
+*(Note: Ensure you are connecting to the correct port depending on your local or production environment.)*
 
 ## 🤝 Development Team
 
-- K.V.V. Thishan
-- T.I.K. Vithanage
-- M.V.P. Abeywardhana
-- H.K.C. Hashan
+- Venusha Thishan
+- Thiloka Indhuwari
+- Maheema Vihangi
+- Chamira Hashan
