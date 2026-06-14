@@ -7,6 +7,7 @@ import {
   Request,
   UseGuards,
   Param,
+  Query,
 } from '@nestjs/common';
 import { LicenseService } from './license.service';
 import {
@@ -15,8 +16,11 @@ import {
   ApiBearerAuth,
   ApiProperty,
   ApiPropertyOptional,
+  PartialType,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 import {
   IsString,
   IsNotEmpty,
@@ -119,9 +123,11 @@ export class UpdateStatusDto {
   status: 'ACTIVE' | 'SUSPENDED' | 'EXPIRED' | 'REVOKED';
 }
 
+export class UpdateLicenseDto extends PartialType(CreateLicenseDto) {}
+
 @ApiTags('Driving License')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('license')
 export class LicenseController {
   constructor(private readonly licenseService: LicenseService) {}
@@ -174,9 +180,35 @@ export class LicenseController {
     return this.licenseService.updateStatus(id, data.status);
   }
 
-  @ApiOperation({ summary: 'Get License by NIC (Admin/Officer Only)' })
+  @ApiOperation({ summary: 'Get License by NIC' })
   @Get('search/:nic')
   async getLicenseByNIC(@Param('nic') nic: string) {
     return this.licenseService.getLicenseByNIC(nic);
+  }
+
+  @ApiOperation({ summary: 'DMT Admin: Get all licenses (Can filter by NIC)' })
+  @Roles('DMT_ADMIN')
+  @Get('all')
+  async getAllLicenses(@Query('nic') nic?: string) {
+    return this.licenseService.getAllLicenses(nic);
+  }
+
+  @ApiOperation({ summary: 'DMT Admin: Update License Details' })
+  @Roles('DMT_ADMIN')
+  @Patch(':id/update')
+  async updateLicenseDetails(
+    @Param('id') id: string,
+    @Body() updateData: UpdateLicenseDto,
+  ) {
+    return this.licenseService.updateLicenseDetails(id, updateData);
+  }
+
+  @ApiOperation({
+    summary: 'DMT Admin: Get licenses with Fines (Can filter by NIC)',
+  })
+  @Roles('DMT_ADMIN')
+  @Get('with-fines')
+  async getLicensesWithFines(@Query('nic') nic?: string) {
+    return this.licenseService.getLicensesWithFines(nic);
   }
 }

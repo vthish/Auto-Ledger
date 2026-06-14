@@ -25,11 +25,25 @@ import {
   IsDateString,
   IsOptional,
   IsEmail,
+  Matches,
 } from 'class-validator';
 
 export class CreateDivisionDto {
-  @ApiProperty() @IsString() @IsNotEmpty() divisionName: string;
+  @ApiProperty({ example: 'DIV-001' })
+  @IsString()
+  @IsNotEmpty()
+  @Matches(/^DIV-\d{3,}$/, {
+    message:
+      'Division ID must start with DIV- followed by at least 3 digits (e.g., DIV-001)',
+  })
+  divisionId: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  divisionName: string;
 }
+
 export class CreateHeadDto {
   @ApiProperty() @IsString() @IsNotEmpty() divisionName: string;
   @ApiProperty() @IsString() @IsNotEmpty() username: string;
@@ -37,12 +51,14 @@ export class CreateHeadDto {
   @ApiProperty() @IsString() @IsNotEmpty() name: string;
   @ApiProperty() @IsString() @IsNotEmpty() passwordStr: string;
 }
+
 export class CreateOfficerDto {
   @ApiProperty() @IsString() @IsNotEmpty() badgeNo: string;
   @ApiProperty() @IsEmail() @IsNotEmpty() email: string;
   @ApiProperty() @IsString() @IsNotEmpty() name: string;
   @ApiProperty() @IsString() @IsNotEmpty() passwordStr: string;
 }
+
 export class AssignShiftDto {
   @ApiProperty() @IsString() @IsNotEmpty() officerId: string;
   @ApiProperty() @IsDateString() date: Date;
@@ -50,6 +66,7 @@ export class AssignShiftDto {
   @ApiProperty() @IsDateString() endTime: Date;
   @ApiProperty() @IsString() location: string;
 }
+
 export class UpdateShiftDto {
   @ApiPropertyOptional() @IsDateString() @IsOptional() date?: Date;
   @ApiPropertyOptional() @IsDateString() @IsOptional() startTime?: Date;
@@ -74,7 +91,11 @@ export class OfficersController {
     @Request() req: OfficerAuthRequest,
     @Body() data: CreateDivisionDto,
   ) {
-    return this.officersService.createDivision(data.divisionName, req.user.id);
+    return this.officersService.createDivision(
+      data.divisionId,
+      data.divisionName,
+      req.user.id,
+    );
   }
 
   @Roles('POLICE_ADMIN')

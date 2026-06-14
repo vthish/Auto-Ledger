@@ -11,14 +11,28 @@ import { UpdateShiftDto } from './officers.controller';
 export class OfficersService {
   constructor(private prisma: PrismaService) {}
 
-  async createDivision(divisionName: string, policeAdminId: string) {
+  async createDivision(
+    divisionId: string,
+    divisionName: string,
+    policeAdminId: string,
+  ) {
+    const existingId = await this.prisma.division.findUnique({
+      where: { division_Id: divisionId },
+    });
+    if (existingId) throw new BadRequestException('Division ID already exists');
+
     const existingDivision = await this.prisma.division.findUnique({
       where: { division_Name: divisionName },
     });
     if (existingDivision)
       throw new BadRequestException('Division name already exists');
+
     return this.prisma.division.create({
-      data: { division_Name: divisionName, police_Admin_Id: policeAdminId },
+      data: {
+        division_Id: divisionId,
+        division_Name: divisionName,
+        police_Admin_Id: policeAdminId,
+      },
     });
   }
 

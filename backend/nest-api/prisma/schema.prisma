@@ -111,7 +111,7 @@ model Temporary_License {
 }
 
 model Division {
-  division_Id     String           @id @default(uuid())
+  division_Id     String           @id
   division_Name   String           @unique
   police_Admin_Id String
   policeAdmin     Police_Admin     @relation(fields: [police_Admin_Id], references: [police_Admin_Id])
