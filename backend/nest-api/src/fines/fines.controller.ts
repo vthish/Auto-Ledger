@@ -17,7 +17,15 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
+// Request එකට හරියට Type එකක් හදමු
+export interface AuthRequest {
+  user: { id: string; role?: string };
+}
+
+@ApiTags('Fines & Court Cases')
+@ApiBearerAuth()
 @Controller('fines')
 export class FinesController {
   constructor(private readonly finesService: FinesService) {}
@@ -26,7 +34,7 @@ export class FinesController {
   @Roles('TRAFFIC_OFFICER')
   @Post()
   issueFine(
-    @Request() req: { user: { id: string } },
+    @Request() req: AuthRequest,
     @Body() body: { licenseId: string; offenseIds: string[]; comment?: string },
   ) {
     return this.finesService.issueFine({
@@ -39,7 +47,7 @@ export class FinesController {
 
   @UseGuards(JwtAuthGuard)
   @Get('my-fines')
-  getMyFines(@Request() req: { user: { id: string } }) {
+  getMyFines(@Request() req: AuthRequest) {
     return this.finesService.getMyFines(req.user.id);
   }
 
@@ -87,10 +95,7 @@ export class FinesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('POLICE_ADMIN')
   @Post('offenses')
-  createOffense(
-    @Request() req: { user: { id: string } },
-    @Body() body: CreateOffenseData,
-  ) {
+  createOffense(@Request() req: AuthRequest, @Body() body: CreateOffenseData) {
     return this.finesService.createOffenseCategory(body, req.user.id);
   }
 
@@ -106,5 +111,19 @@ export class FinesController {
   @Delete('offenses/:id')
   deleteOffense(@Param('id') id: string) {
     return this.finesService.deleteOffenseCategory(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('DIVISIONAL_HEAD')
+  @Get('court-cases')
+  getCourtCases(@Request() req: AuthRequest) {
+    return this.finesService.getCourtCasesByDH(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('DIVISIONAL_HEAD')
+  @Get('dashboard-stats')
+  getDashboardStats(@Request() req: AuthRequest) {
+    return this.finesService.getDashboardStats(req.user.id);
   }
 }

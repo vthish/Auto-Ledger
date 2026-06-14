@@ -32,9 +32,9 @@ enum Officer_Role {
 }
 
 model QR_Scan_History {
-  scan_Id              String   @id @default(uuid())
+  scan_Id              String          @id @default(uuid())
   qr_Token             String
-  scan_Time            DateTime @default(now())
+  scan_Time            DateTime        @default(now())
   traffic_Officer_Name String
   driver_Name          String
   location             String?
@@ -73,6 +73,8 @@ model User {
 model Driving_License {
   license_Id        String                     @id @default(uuid())
   license_No        String                     @unique
+  full_Name         String
+  nic_No            String                     @unique
   status            License_Status             @default(ACTIVE)
   image             String?
   points            Int                        @default(24)
@@ -153,14 +155,14 @@ model Shift {
 }
 
 model Offence_Category {
-  offense_Id      String       @id @default(uuid())
-  code            String       @unique
+  offense_Id      String         @id @default(uuid())
+  code            String         @unique
   name            String
   points_Value    Int
   amount          Float
-  is_Court_Case   Boolean      @default(false)
+  is_Court_Case   Boolean        @default(false)
   police_Admin_Id String
-  policeAdmin     Police_Admin @relation(fields: [police_Admin_Id], references: [police_Admin_Id])
+  policeAdmin     Police_Admin   @relation(fields: [police_Admin_Id], references: [police_Admin_Id])
   fines           Fine_Offence[]
 }
 

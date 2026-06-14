@@ -16,11 +16,12 @@ export interface VehicleCategoryData {
 
 export interface CreateLicenseData {
   licenseNo: string;
+  fullName: string;
+  nicNo: string;
   address: string;
   bloodGroup: string;
   dateOfBirth: string | Date;
   issueDate: string | Date;
-  userId: string;
   dmtAdminId: string;
   image?: string;
   categories: VehicleCategoryData[];
@@ -32,13 +33,13 @@ export class LicenseService {
 
   async createLicense(data: CreateLicenseData) {
     let user = await this.prisma.user.findUnique({
-      where: { nic_No: data.userId },
+      where: { nic_No: data.nicNo },
     });
 
     if (!user) {
       user = await this.prisma.user.create({
         data: {
-          nic_No: data.userId,
+          nic_No: data.nicNo,
           name: 'Pending App Registration',
           password: 'NOT_REGISTERED',
           mobile_Phone_No: 'PENDING',
@@ -50,6 +51,8 @@ export class LicenseService {
     return await this.prisma.driving_License.create({
       data: {
         license_No: data.licenseNo,
+        full_Name: data.fullName,
+        nic_No: data.nicNo,
         address: data.address,
         blood_Group: data.bloodGroup,
         date_of_birth: new Date(data.dateOfBirth),
@@ -187,5 +190,24 @@ export class LicenseService {
       where: { license_Id: licenseId },
       data: { status: newStatus },
     });
+  }
+
+  async getLicenseByNIC(nicNo: string) {
+    const license = await this.prisma.driving_License.findUnique({
+      where: { nic_No: nicNo },
+      include: {
+        vehicleCategories: true,
+        fines: {
+          include: {
+            offenses: { include: { offenceCategory: true } },
+            payment: true,
+          },
+          orderBy: { issue_At: 'desc' },
+        },
+      },
+    });
+
+    if (!license) throw new NotFoundException('License not found for this NIC');
+    return license;
   }
 }
