@@ -7,6 +7,7 @@ import {
   Request,
   UseGuards,
   Param,
+  Query,
 } from '@nestjs/common';
 import { LicenseService } from './license.service';
 import {
@@ -15,8 +16,11 @@ import {
   ApiBearerAuth,
   ApiProperty,
   ApiPropertyOptional,
+  PartialType,
 } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 import {
   IsString,
   IsNotEmpty,
@@ -46,7 +50,7 @@ export class VehicleCategoryDto {
   @IsDateString()
   expiryDate: Date;
 
-  @ApiPropertyOptional({ example: 'Auto only' })
+  @ApiPropertyOptional({ example: 'AT' })
   @IsString()
   @IsOptional()
   restriction?: string;
@@ -57,6 +61,16 @@ export class CreateLicenseDto {
   @IsString()
   @IsNotEmpty()
   licenseNo: string;
+
+  @ApiProperty({ example: 'K.V.V. Thishan' })
+  @IsString()
+  @IsNotEmpty()
+  fullName: string;
+
+  @ApiProperty({ example: '200204802139' })
+  @IsString()
+  @IsNotEmpty()
+  nicNo: string;
 
   @ApiProperty({ example: 'No 10, Galle Road, Galle' })
   @IsString()
@@ -75,11 +89,6 @@ export class CreateLicenseDto {
   @ApiProperty({ example: '2024-01-01T00:00:00Z' })
   @IsDateString()
   issueDate: Date;
-
-  @ApiProperty({ example: '200204802139' })
-  @IsString()
-  @IsNotEmpty()
-  userId: string;
 
   @ApiPropertyOptional({ example: 'base64_image_string' })
   @IsString()
@@ -114,14 +123,16 @@ export class UpdateStatusDto {
   status: 'ACTIVE' | 'SUSPENDED' | 'EXPIRED' | 'REVOKED';
 }
 
+export class UpdateLicenseDto extends PartialType(CreateLicenseDto) {}
+
 @ApiTags('Driving License')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('license')
 export class LicenseController {
   constructor(private readonly licenseService: LicenseService) {}
 
-  @ApiOperation({ summary: 'Create a new driving license (DMT Admin Only)' })
+  @ApiOperation({ summary: 'Create a new driving license' })
   @Post()
   async createLicense(
     @Request() req: AuthRequest,
@@ -129,11 +140,12 @@ export class LicenseController {
   ) {
     return this.licenseService.createLicense({
       licenseNo: data.licenseNo,
+      fullName: data.fullName,
+      nicNo: data.nicNo,
       address: data.address,
       bloodGroup: data.bloodGroup,
       dateOfBirth: data.dateOfBirth,
       issueDate: data.issueDate,
-      userId: data.userId,
       image: data.image,
       categories: data.categories,
       dmtAdminId: req.user.id,
@@ -152,7 +164,7 @@ export class LicenseController {
     return this.licenseService.generateLicenseQR(req.user.id);
   }
 
-  @ApiOperation({ summary: 'Scan License QR Code (Traffic Officer Only)' })
+  @ApiOperation({ summary: 'Scan License QR Code' })
   @Post('scan-qr')
   async scanQR(@Request() req: AuthRequest, @Body() data: ScanQRDto) {
     return this.licenseService.scanLicenseQR(
@@ -162,11 +174,41 @@ export class LicenseController {
     );
   }
 
-  @ApiOperation({
-    summary: 'Update License Status (DMT Admin / Divisional Head)',
-  })
+  @ApiOperation({ summary: 'Update License Status' })
   @Patch(':id/status')
   async updateStatus(@Param('id') id: string, @Body() data: UpdateStatusDto) {
     return this.licenseService.updateStatus(id, data.status);
+  }
+
+  @ApiOperation({ summary: 'Get License by NIC' })
+  @Get('search/:nic')
+  async getLicenseByNIC(@Param('nic') nic: string) {
+    return this.licenseService.getLicenseByNIC(nic);
+  }
+
+  @ApiOperation({ summary: 'DMT Admin: Get all licenses (Can filter by NIC)' })
+  @Roles('DMT_ADMIN')
+  @Get('all')
+  async getAllLicenses(@Query('nic') nic?: string) {
+    return this.licenseService.getAllLicenses(nic);
+  }
+
+  @ApiOperation({ summary: 'DMT Admin: Update License Details' })
+  @Roles('DMT_ADMIN')
+  @Patch(':id/update')
+  async updateLicenseDetails(
+    @Param('id') id: string,
+    @Body() updateData: UpdateLicenseDto,
+  ) {
+    return this.licenseService.updateLicenseDetails(id, updateData);
+  }
+
+  @ApiOperation({
+    summary: 'DMT Admin: Get licenses with Fines (Can filter by NIC)',
+  })
+  @Roles('DMT_ADMIN')
+  @Get('with-fines')
+  async getLicensesWithFines(@Query('nic') nic?: string) {
+    return this.licenseService.getLicensesWithFines(nic);
   }
 }

@@ -17,7 +17,14 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
+export interface AuthRequest {
+  user: { id: string; role?: string };
+}
+
+@ApiTags('Fines & Court Cases')
+@ApiBearerAuth()
 @Controller('fines')
 export class FinesController {
   constructor(private readonly finesService: FinesService) {}
@@ -26,7 +33,7 @@ export class FinesController {
   @Roles('TRAFFIC_OFFICER')
   @Post()
   issueFine(
-    @Request() req: { user: { id: string } },
+    @Request() req: AuthRequest,
     @Body() body: { licenseId: string; offenseIds: string[]; comment?: string },
   ) {
     return this.finesService.issueFine({
@@ -39,34 +46,20 @@ export class FinesController {
 
   @UseGuards(JwtAuthGuard)
   @Get('my-fines')
-  getMyFines(@Request() req: { user: { id: string } }) {
+  getMyFines(@Request() req: AuthRequest) {
     return this.finesService.getMyFines(req.user.id);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post(':id/pay')
-  payFine(
-    @Param('id') id: string,
-    @Body() body: { amount: number; paymentMethod: string },
-  ) {
-    return this.finesService.payFine(id, body.amount, body.paymentMethod);
+  payFine(@Param('id') id: string, @Body() body: { amount: number }) {
+    return this.finesService.payFine(id, body.amount);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('pay-bulk')
-  payBulkFines(
-    @Body()
-    body: {
-      fineIds: string[];
-      totalAmount: number;
-      paymentMethod: string;
-    },
-  ) {
-    return this.finesService.payBulkFines(
-      body.fineIds,
-      body.totalAmount,
-      body.paymentMethod,
-    );
+  payBulkFines(@Body() body: { fineIds: string[]; totalAmount: number }) {
+    return this.finesService.payBulkFines(body.fineIds, body.totalAmount);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -87,10 +80,7 @@ export class FinesController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('POLICE_ADMIN')
   @Post('offenses')
-  createOffense(
-    @Request() req: { user: { id: string } },
-    @Body() body: CreateOffenseData,
-  ) {
+  createOffense(@Request() req: AuthRequest, @Body() body: CreateOffenseData) {
     return this.finesService.createOffenseCategory(body, req.user.id);
   }
 
@@ -106,5 +96,19 @@ export class FinesController {
   @Delete('offenses/:id')
   deleteOffense(@Param('id') id: string) {
     return this.finesService.deleteOffenseCategory(id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('DIVISIONAL_HEAD')
+  @Get('court-cases')
+  getCourtCases(@Request() req: AuthRequest) {
+    return this.finesService.getCourtCasesByDH(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('DIVISIONAL_HEAD')
+  @Get('dashboard-stats')
+  getDashboardStats(@Request() req: AuthRequest) {
+    return this.finesService.getDashboardStats(req.user.id);
   }
 }

@@ -16,14 +16,25 @@ export interface VehicleCategoryData {
 
 export interface CreateLicenseData {
   licenseNo: string;
+  fullName: string;
+  nicNo: string;
   address: string;
   bloodGroup: string;
   dateOfBirth: string | Date;
   issueDate: string | Date;
-  userId: string;
   dmtAdminId: string;
   image?: string;
   categories: VehicleCategoryData[];
+}
+
+export interface UpdateLicenseData {
+  fullName?: string;
+  address?: string;
+  bloodGroup?: string;
+  image?: string;
+  dateOfBirth?: string | Date;
+  issueDate?: string | Date;
+  categories?: VehicleCategoryData[];
 }
 
 @Injectable()
@@ -32,13 +43,13 @@ export class LicenseService {
 
   async createLicense(data: CreateLicenseData) {
     let user = await this.prisma.user.findUnique({
-      where: { nic_No: data.userId },
+      where: { nic_No: data.nicNo },
     });
 
     if (!user) {
       user = await this.prisma.user.create({
         data: {
-          nic_No: data.userId,
+          nic_No: data.nicNo,
           name: 'Pending App Registration',
           password: 'NOT_REGISTERED',
           mobile_Phone_No: 'PENDING',
@@ -50,6 +61,8 @@ export class LicenseService {
     return await this.prisma.driving_License.create({
       data: {
         license_No: data.licenseNo,
+        full_Name: data.fullName,
+        nic_No: data.nicNo,
         address: data.address,
         blood_Group: data.bloodGroup,
         date_of_birth: new Date(data.dateOfBirth),
@@ -186,6 +199,99 @@ export class LicenseService {
     return this.prisma.driving_License.update({
       where: { license_Id: licenseId },
       data: { status: newStatus },
+    });
+  }
+
+  async getLicenseByNIC(nicNo: string) {
+    const license = await this.prisma.driving_License.findUnique({
+      where: { nic_No: nicNo },
+      include: {
+        vehicleCategories: true,
+        fines: {
+          include: {
+            offenses: { include: { offenceCategory: true } },
+            payment: true,
+          },
+          orderBy: { issue_At: 'desc' },
+        },
+      },
+    });
+
+    if (!license) throw new NotFoundException('License not found for this NIC');
+    return license;
+  }
+
+  async getAllLicenses(nic?: string) {
+    return this.prisma.driving_License.findMany({
+      where: nic ? { nic_No: { contains: nic, mode: 'insensitive' } } : {},
+      include: {
+        vehicleCategories: true,
+      },
+      orderBy: { issue_Date: 'desc' },
+    });
+  }
+
+  async updateLicenseDetails(licenseId: string, data: UpdateLicenseData) {
+    const license = await this.prisma.driving_License.findUnique({
+      where: { license_Id: licenseId },
+    });
+
+    if (!license) throw new NotFoundException('License not found');
+
+    const updatePayload: {
+      full_Name?: string;
+      address?: string;
+      blood_Group?: string;
+      image?: string;
+      date_of_birth?: Date;
+      issue_Date?: Date;
+      vehicleCategories?: any;
+    } = {};
+
+    if (data.fullName) updatePayload.full_Name = data.fullName;
+    if (data.address) updatePayload.address = data.address;
+    if (data.bloodGroup) updatePayload.blood_Group = data.bloodGroup;
+    if (data.image) updatePayload.image = data.image;
+    if (data.dateOfBirth)
+      updatePayload.date_of_birth = new Date(data.dateOfBirth);
+    if (data.issueDate) updatePayload.issue_Date = new Date(data.issueDate);
+
+    if (data.categories && data.categories.length > 0) {
+      await this.prisma.license_Vehicle_Category.deleteMany({
+        where: { license_Id: licenseId },
+      });
+      updatePayload.vehicleCategories = {
+        create: data.categories.map((cat) => ({
+          vehicle_Class: cat.vehicleClass,
+          issue_Date: new Date(cat.issueDate),
+          expiry_Date: new Date(cat.expiryDate),
+          restriction: cat.restriction || null,
+        })),
+      };
+    }
+
+    return this.prisma.driving_License.update({
+      where: { license_Id: licenseId },
+      data: updatePayload,
+      include: { vehicleCategories: true },
+    });
+  }
+
+  async getLicensesWithFines(nic?: string) {
+    return this.prisma.driving_License.findMany({
+      where: {
+        fines: { some: {} },
+        ...(nic ? { nic_No: { contains: nic, mode: 'insensitive' } } : {}),
+      },
+      include: {
+        fines: {
+          include: {
+            offenses: { include: { offenceCategory: true } },
+            trafficOfficer: { select: { name: true, badge_No: true } },
+          },
+          orderBy: { issue_At: 'desc' },
+        },
+      },
     });
   }
 }
