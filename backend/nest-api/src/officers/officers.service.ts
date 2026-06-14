@@ -6,7 +6,6 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { UpdateShiftDto } from './officers.controller';
-import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class OfficersService {
@@ -16,15 +15,10 @@ export class OfficersService {
     const existingDivision = await this.prisma.division.findUnique({
       where: { division_Name: divisionName },
     });
-    if (existingDivision) {
+    if (existingDivision)
       throw new BadRequestException('Division name already exists');
-    }
-
     return this.prisma.division.create({
-      data: {
-        division_Name: divisionName,
-        police_Admin_Id: policeAdminId,
-      },
+      data: { division_Name: divisionName, police_Admin_Id: policeAdminId },
     });
   }
 
@@ -39,27 +33,22 @@ export class OfficersService {
       where: { division_Name: data.divisionName },
       include: { divisionalHead: true },
     });
-
     if (!existingDivision) throw new NotFoundException('Division not found');
     if (existingDivision.divisionalHead)
       throw new BadRequestException(
         'This Division already has a Head assigned',
       );
-
     const existingUsername = await this.prisma.divisional_Head.findUnique({
       where: { username: data.username },
     });
     if (existingUsername)
       throw new BadRequestException('Head username already exists');
-
     const existingEmail = await this.prisma.divisional_Head.findUnique({
       where: { email: data.email },
     });
     if (existingEmail)
       throw new BadRequestException('Head email already exists');
-
     const hashedPassword = await bcrypt.hash(data.passwordStr, 10);
-
     return this.prisma.divisional_Head.create({
       data: {
         username: data.username,
@@ -84,15 +73,12 @@ export class OfficersService {
     });
     if (existingBadge)
       throw new BadRequestException('Badge number already exists');
-
     const existingEmail = await this.prisma.traffic_Officer.findUnique({
       where: { email: data.email },
     });
     if (existingEmail)
       throw new BadRequestException('Officer email already exists');
-
     const hashedPassword = await bcrypt.hash(data.passwordStr, 10);
-
     return this.prisma.traffic_Officer.create({
       data: {
         badge_No: data.badgeNo,
@@ -116,7 +102,6 @@ export class OfficersService {
       where: { traffic_Officer_Id: data.officerId },
     });
     if (!officer) throw new NotFoundException('Officer not found');
-
     return this.prisma.shift.create({
       data: {
         traffic_Officer_Id: data.officerId,
@@ -135,7 +120,12 @@ export class OfficersService {
     });
     if (!shift) throw new NotFoundException('Shift not found');
 
-    const updateData: Prisma.ShiftUpdateInput = {};
+    const updateData: {
+      date?: Date;
+      start_Time?: Date;
+      end_Time?: Date;
+      location?: string;
+    } = {};
     if (updateShiftDto.date) updateData.date = updateShiftDto.date;
     if (updateShiftDto.startTime)
       updateData.start_Time = updateShiftDto.startTime;
@@ -153,7 +143,6 @@ export class OfficersService {
       where: { traffic_Officer_Id: officerId },
     });
     if (!officer) throw new NotFoundException('Officer not found');
-
     return this.prisma.shift.findMany({
       where: { traffic_Officer_Id: officerId },
       orderBy: { start_Time: 'desc' },
@@ -161,9 +150,10 @@ export class OfficersService {
   }
 
   async getDivisionOfficers(headId: string, search?: string) {
-    const whereClause: Prisma.Traffic_OfficerWhereInput = {
-      divisional_Head_Id: headId,
-    };
+    const whereClause: {
+      divisional_Head_Id: string;
+      OR?: { [key: string]: { contains: string; mode: 'insensitive' } }[];
+    } = { divisional_Head_Id: headId };
 
     if (search) {
       whereClause.OR = [
@@ -173,7 +163,6 @@ export class OfficersService {
     }
 
     const now = new Date();
-
     const officers = await this.prisma.traffic_Officer.findMany({
       where: whereClause,
       select: {

@@ -26,16 +26,6 @@ import {
   IsOptional,
   IsEmail,
 } from 'class-validator';
-import { Request as ExpressRequest } from 'express';
-
-interface UserPayload {
-  id: string;
-  role: string;
-}
-
-interface RequestWithUser extends ExpressRequest {
-  user: UserPayload;
-}
 
 export class CreateDivisionDto {
   @ApiProperty() @IsString() @IsNotEmpty() divisionName: string;
@@ -67,6 +57,10 @@ export class UpdateShiftDto {
   @ApiPropertyOptional() @IsString() @IsOptional() location?: string;
 }
 
+export interface OfficerAuthRequest {
+  user: { id: string; role?: string };
+}
+
 @ApiTags('Police Management')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -77,7 +71,7 @@ export class OfficersController {
   @Roles('POLICE_ADMIN')
   @Post('division')
   async createDivision(
-    @Request() req: RequestWithUser,
+    @Request() req: OfficerAuthRequest,
     @Body() data: CreateDivisionDto,
   ) {
     return this.officersService.createDivision(data.divisionName, req.user.id);
@@ -92,7 +86,7 @@ export class OfficersController {
   @Roles('DIVISIONAL_HEAD')
   @Post('officer')
   async createOfficer(
-    @Request() req: RequestWithUser,
+    @Request() req: OfficerAuthRequest,
     @Body() data: CreateOfficerDto,
   ) {
     return this.officersService.createTrafficOfficer({
@@ -119,7 +113,7 @@ export class OfficersController {
   @Roles('DIVISIONAL_HEAD')
   @Get('my-division')
   async getMyDivisionOfficers(
-    @Request() req: RequestWithUser,
+    @Request() req: OfficerAuthRequest,
     @Query('search') search?: string,
   ) {
     return this.officersService.getDivisionOfficers(req.user.id, search);

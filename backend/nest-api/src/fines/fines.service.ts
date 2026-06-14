@@ -19,17 +19,6 @@ export interface UpdateOffenseData {
   isCourtCase?: boolean;
 }
 
-interface PaymentResult {
-  message: string;
-  paymentId: string;
-  fineStatus: string;
-}
-
-interface BulkPaymentResult {
-  message: string;
-  payments: string[];
-}
-
 @Injectable()
 export class FinesService {
   constructor(private prisma: PrismaService) {}
@@ -44,18 +33,15 @@ export class FinesService {
       where: { traffic_Officer_Id: data.officerId },
     });
     if (!officer) throw new NotFoundException('Officer not found');
-
     const license = await this.prisma.driving_License.findUnique({
       where: { license_Id: data.licenseId },
     });
     if (!license) throw new NotFoundException('License not found');
-
     const offenses = await this.prisma.offence_Category.findMany({
       where: { offense_Id: { in: data.offenseIds } },
     });
     if (offenses.length === 0)
       throw new BadRequestException('Invalid offenses');
-
     const isCourtCase = offenses.some((o) => o.is_Court_Case);
     const fineDueDate = new Date();
     fineDueDate.setDate(fineDueDate.getDate() + 14);
@@ -70,13 +56,11 @@ export class FinesService {
           comment: data.comment || null,
         },
       });
-
       for (const offense of offenses) {
         await tx.fine_Offence.create({
           data: { fine_Id: fine.fine_Id, offense_Id: offense.offense_Id },
         });
       }
-
       await tx.driving_License.update({
         where: { license_Id: data.licenseId },
         data: {
@@ -86,13 +70,11 @@ export class FinesService {
           status: 'SUSPENDED',
         },
       });
-
       if (!isCourtCase) {
         await tx.temporary_License.create({
           data: { license_Id: data.licenseId, expiry_Date: fineDueDate },
         });
       }
-
       return fine;
     });
   }
@@ -102,7 +84,6 @@ export class FinesService {
       where: { user_Id: userId },
     });
     if (!license) throw new NotFoundException('License not found');
-
     return this.prisma.fine.findMany({
       where: { license_Id: license.license_Id },
       include: {
@@ -114,7 +95,7 @@ export class FinesService {
     });
   }
 
-  async payFine(fineId: string, amount: number): Promise<PaymentResult> {
+  async payFine(fineId: string, amount: number) {
     const fine = await this.prisma.fine.findUnique({
       where: { fine_Id: fineId },
     });
@@ -141,7 +122,6 @@ export class FinesService {
       await tx.temporary_License.deleteMany({
         where: { license_Id: fine.license_Id },
       });
-
       return {
         message: `Payment successful.`,
         paymentId: payment.payment_Id,
@@ -150,17 +130,12 @@ export class FinesService {
     });
   }
 
-  async payBulkFines(
-    fineIds: string[],
-    totalAmount: number,
-  ): Promise<BulkPaymentResult> {
+  async payBulkFines(fineIds: string[], totalAmount: number) {
     const fines = await this.prisma.fine.findMany({
       where: { fine_Id: { in: fineIds } },
     });
-
     if (fines.length !== fineIds.length)
       throw new BadRequestException('Some fines not found');
-
     for (const fine of fines) {
       if (fine.status === 'PAID')
         throw new BadRequestException(`Fine ${fine.fine_Id} already paid`);
@@ -169,10 +144,8 @@ export class FinesService {
     }
 
     const licenseId = fines[0].license_Id;
-
     return this.prisma.$transaction(async (tx) => {
-      const paymentIds: string[] = [];
-
+      const payments = [];
       for (const fineId of fineIds) {
         const p = await tx.payment.create({
           data: {
@@ -181,27 +154,22 @@ export class FinesService {
             status: 'COMPLETED',
           },
         });
-
-        paymentIds.push(p.payment_Id);
-
+        payments.push(p);
         await tx.fine.update({
           where: { fine_Id: fineId },
           data: { status: 'PAID' },
         });
       }
-
       await tx.driving_License.update({
         where: { license_Id: licenseId },
         data: { status: 'ACTIVE' },
       });
-
       await tx.temporary_License.deleteMany({
         where: { license_Id: licenseId },
       });
-
       return {
         message: 'Bulk payment successful',
-        payments: paymentIds,
+        payments: payments.map((p: { payment_Id: string }) => p.payment_Id),
       };
     });
   }
@@ -211,7 +179,6 @@ export class FinesService {
       where: { fine_Id: fineId },
     });
     if (!fine) throw new NotFoundException('Fine not found');
-
     return this.prisma.$transaction(async (tx) => {
       await tx.fine.update({
         where: { fine_Id: fineId },
@@ -227,18 +194,17 @@ export class FinesService {
   async getAllOffenses() {
     return this.prisma.offence_Category.findMany({ orderBy: { code: 'asc' } });
   }
-
   async createOffenseCategory(data: CreateOffenseData, policeAdminId: string) {
     return this.prisma.offence_Category.create({
       data: {
         ...data,
         points_Value: data.points,
+        amount: data.amount,
         is_Court_Case: data.isCourtCase,
         police_Admin_Id: policeAdminId,
       },
     });
   }
-
   async updateOffenseCategory(id: string, data: UpdateOffenseData) {
     return this.prisma.offence_Category.update({
       where: { offense_Id: id },
@@ -250,7 +216,6 @@ export class FinesService {
       },
     });
   }
-
   async deleteOffenseCategory(id: string) {
     return this.prisma.offence_Category.delete({ where: { offense_Id: id } });
   }
@@ -261,7 +226,6 @@ export class FinesService {
       select: { traffic_Officer_Id: true },
     });
     const officerIds = officers.map((o) => o.traffic_Officer_Id);
-
     return this.prisma.fine.findMany({
       where: { status: 'OVERDUE', traffic_Officer_Id: { in: officerIds } },
       include: {
@@ -289,13 +253,11 @@ export class FinesService {
         },
       },
     });
-
     const officerIds = officers.map((o) => o.traffic_Officer_Id);
     const fines = await this.prisma.fine.findMany({
       where: { traffic_Officer_Id: { in: officerIds } },
       include: { payment: true },
     });
-
     return {
       totalOfficers: officers.length,
       activeOfficersOnDuty: officers.filter((o) => o.shifts.length > 0).length,
