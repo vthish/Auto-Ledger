@@ -1,4 +1,3 @@
-// app/dmt-dashboard/layout.tsx
 "use client";
 
 import React from 'react';
@@ -16,7 +15,7 @@ export default function DMTLayout({ children }: { children: React.ReactNode }) {
   };
 
   const getHeaderDetails = () => {
-    if (pathname.includes('/add-driver')) return { title: 'Issue & Manage Licenses', icon: <UserPlus className="mr-3 text-red-500" /> };
+    if (pathname.includes('/add-driver')) return { title: 'Issue New License', icon: <UserPlus className="mr-3 text-red-500" /> };
     if (pathname.includes('/drivers')) return { title: 'Driver Directory', icon: <Users className="mr-3 text-red-500" /> };
     if (pathname.includes('/fines')) return { title: 'Police Traffic Fines Database', icon: <FileWarning className="mr-3 text-red-500" /> };
     return { title: 'DMT Admin Dashboard', icon: <LayoutDashboard className="mr-3 text-red-500" /> };
@@ -31,7 +30,6 @@ export default function DMTLayout({ children }: { children: React.ReactNode }) {
       {/* --- SIDEBAR --- */}
       <aside className="w-72 bg-[#141414]/90 backdrop-blur-xl border-r border-red-900/30 flex flex-col p-6 m-4 rounded-3xl shadow-2xl z-10">
         <div className="mb-8 text-center flex flex-col items-center">
-          {/* DMT Logo */}
           <div className="w-24 h-24 mb-4 flex items-center justify-center rounded-full bg-white p-1 shadow-lg shadow-red-900/50">
             <img src="/dmt_logo.png" alt="DMT Logo" className="w-full h-full object-contain rounded-full" />
           </div>
@@ -41,8 +39,9 @@ export default function DMTLayout({ children }: { children: React.ReactNode }) {
 
         <nav className="flex-1 space-y-2">
           <SidebarBtn to="/dmt-dashboard" icon={<LayoutDashboard size={20} />} label="Overview" currentPath={pathname} />
-          <SidebarBtn to="/dmt-dashboard/add-driver" icon={<UserPlus size={20} />} label="Manage Licenses" currentPath={pathname} />
-          {/* Aluth Fines View eka */}
+          <SidebarBtn to="/dmt-dashboard/add-driver" icon={<UserPlus size={20} />} label="Issue License" currentPath={pathname} />
+          {/* ALUTH LINK EKA METHANA THIYENAWA */}
+          <SidebarBtn to="/dmt-dashboard/drivers" icon={<Users size={20} />} label="Driver Directory" currentPath={pathname} />
           <SidebarBtn to="/dmt-dashboard/fines" icon={<FileWarning size={20} />} label="Traffic Fines" currentPath={pathname} />
         </nav>
 

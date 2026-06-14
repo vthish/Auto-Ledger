@@ -1,7 +1,8 @@
 "use client";
 
 import React from 'react';
-import { Users, CheckCircle, AlertTriangle } from 'lucide-react';
+import Link from 'next/link';
+import { Users, CheckCircle, AlertTriangle, ArrowRight, CreditCard } from 'lucide-react';
 
 export default function DMTDashboard() {
   return (
@@ -13,20 +14,43 @@ export default function DMTDashboard() {
       </div>
 
       <div className="bg-[#141414]/80 border border-red-900/20 rounded-3xl p-8 backdrop-blur-md shadow-2xl mt-8">
-        <h3 className="text-xl font-bold text-white mb-6">Recent License Issuance</h3>
+        <div className="flex justify-between items-center mb-6 border-b border-red-900/20 pb-4">
+          <h3 className="text-xl font-bold text-white flex items-center">
+            <CreditCard className="mr-2 text-red-500" size={20}/> Recently Issued Licenses
+          </h3>
+          <Link href="/dmt-dashboard/drivers" className="flex items-center text-sm font-bold text-red-400 hover:text-red-300 bg-red-900/20 px-4 py-2 rounded-xl transition-colors">
+            View Full Directory <ArrowRight size={16} className="ml-2"/>
+          </Link>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left">
             <thead className="text-slate-500 text-xs uppercase tracking-widest border-b border-red-900/30">
               <tr>
-                <th className="pb-4 px-2">Driver Name</th>
-                <th className="pb-4 px-2">NIC Number</th>
-                <th className="pb-4 px-2">License No</th>
-                <th className="pb-4 px-2">Issue Date</th>
+                <th className="pb-4 px-4">Driver Name</th>
+                <th className="pb-4 px-4">NIC Number</th>
+                <th className="pb-4 px-4">License No</th>
+                <th className="pb-4 px-4">Initial Issue Date</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-red-900/10 text-sm">
-              <tr className="hover:bg-white/5 transition-all"><td className="py-4 px-2 font-bold text-white">Nimal Perera</td><td className="py-4 px-2 text-slate-400">851234567V</td><td className="py-4 px-2 font-mono text-red-400">B5544123</td><td className="py-4 px-2 text-slate-400">2024-05-12</td></tr>
-              <tr className="hover:bg-white/5 transition-all"><td className="py-4 px-2 font-bold text-white">Kasun Silva</td><td className="py-4 px-2 text-slate-400">921234567V</td><td className="py-4 px-2 font-mono text-red-400">B5544456</td><td className="py-4 px-2 text-slate-400">2024-05-11</td></tr>
+              {/* Dummy data for recent 2 drivers */}
+              <tr className="hover:bg-white/5 transition-all">
+                <td className="py-4 px-4 font-bold text-white flex items-center">
+                  <img src="https://i.pravatar.cc/150?u=nimal" className="w-8 h-8 rounded-full mr-3 border border-red-900/50" alt="pic"/> Nimal Perera
+                </td>
+                <td className="py-4 px-4 text-slate-400">851234567V</td>
+                <td className="py-4 px-4 font-mono text-red-400 font-bold">B5544123</td>
+                <td className="py-4 px-4 text-slate-400">2024-01-10</td>
+              </tr>
+              <tr className="hover:bg-white/5 transition-all">
+                <td className="py-4 px-4 font-bold text-white flex items-center">
+                  <img src="https://i.pravatar.cc/150?u=kasun" className="w-8 h-8 rounded-full mr-3 border border-red-900/50" alt="pic"/> Kasun Silva
+                </td>
+                <td className="py-4 px-4 text-slate-400">921234567V</td>
+                <td className="py-4 px-4 font-mono text-red-400 font-bold">B5544456</td>
+                <td className="py-4 px-4 text-slate-400">2022-05-11</td>
+              </tr>
             </tbody>
           </table>
         </div>
