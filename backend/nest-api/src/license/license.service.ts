@@ -52,7 +52,7 @@ export class LicenseService {
           nic_No: data.nicNo,
           name: 'Pending App Registration',
           password: 'NOT_REGISTERED',
-          mobile_Phone_No: 'PENDING',
+          mobile_Phone_No: `PENDING_${data.nicNo}`, 
           device_Id: 'PENDING',
         },
       });
