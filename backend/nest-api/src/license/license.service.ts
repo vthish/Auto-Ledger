@@ -6,6 +6,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import * as crypto from 'crypto';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 export interface VehicleCategoryData {
   vehicleClass: string;
@@ -39,7 +41,39 @@ export interface UpdateLicenseData {
 
 @Injectable()
 export class LicenseService {
-  constructor(private prisma: PrismaService) {}
+  private s3Client: S3Client;
+
+  constructor(private prisma: PrismaService) {
+    this.s3Client = new S3Client({
+      region: process.env.AWS_S3_REGION,
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      },
+    });
+  }
+
+  async getS3UploadUrl(fileName: string, fileType: string) {
+    const bucketName = process.env.AWS_S3_BUCKET_NAME;
+    const cleanFileName = fileName.replace(/\s+/g, '-');
+    const uniqueFileName = `licenses/${Date.now()}-${cleanFileName}`;
+
+    const command = new PutObjectCommand({
+      Bucket: bucketName,
+      Key: uniqueFileName,
+      ContentType: fileType,
+    });
+
+    const uploadUrl = await getSignedUrl(this.s3Client, command, {
+      expiresIn: 60,
+    });
+    const publicFileUrl = `https://${bucketName}.s3.${process.env.AWS_S3_REGION}.amazonaws.com/${uniqueFileName}`;
+
+    return {
+      uploadUrl,
+      fileUrl: publicFileUrl,
+    };
+  }
 
   async createLicense(data: CreateLicenseData) {
     let user = await this.prisma.user.findUnique({
@@ -52,7 +86,7 @@ export class LicenseService {
           nic_No: data.nicNo,
           name: 'Pending App Registration',
           password: 'NOT_REGISTERED',
-          mobile_Phone_No: 'PENDING',
+          mobile_Phone_No: `PENDING_${data.nicNo}`,
           device_Id: 'PENDING',
         },
       });
