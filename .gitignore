@@ -3,6 +3,7 @@
 .env
 .idea/
 .vscode/
+.txt
 
 # --- Nest.js Backend ---
 backend/nest-api/node_modules/

@@ -1,7 +1,9 @@
 import 'dart:async';
-import 'dart:math';
+import 'dart:ui';
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import '../services/api_service.dart';
 import '../utils/secure_storage.dart';
 import 'login_screen.dart';
 
@@ -14,21 +16,23 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  bool _isFront = true;
+
+  Map<String, dynamic>? _licenseData;
+  bool _isLoading = true;
+  String _errorMessage = '';
+
   bool _showQR = false;
+  bool _isGeneratingQR = false;
+  String _qrToken = '';
   int _remainingSeconds = 180;
   Timer? _timer;
 
-  bool _isFront = true;
-
-  final String fakeName = "DOE JOHN SAMANTHA";
-  final String fakeAddress = "NO 123, FAKE ROAD\nCOLOMBO 07";
-  final String fakeNicNo = "199012345678";
-  final String fakeLicenseNo = "B1234567";
-  final String fakeDob = "01.01.1990";
-  final String fakeBloodGroup = "O+";
-  final String fakeIssueDate = "05.07.2022";
-  final String fakeExpiryDate = "05.07.2030";
-  final String fakeRestriction = "AT";
+  @override
+  void initState() {
+    super.initState();
+    _fetchLicenseData();
+  }
 
   @override
   void dispose() {
@@ -36,21 +40,62 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _generateQR() {
+  Future<void> _fetchLicenseData() async {
+    try {
+      final response = await ApiService.dio.get('/license/my-license');
+      setState(() {
+        _licenseData = response.data;
+        _isLoading = false;
+      });
+    } on DioException catch (e) {
+      setState(() {
+        _errorMessage = e.response?.data['message'] ?? 'Failed to load license details.';
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'An unexpected error occurred.';
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _generateQR() async {
     setState(() {
+      _isGeneratingQR = true;
       _showQR = true;
-      _remainingSeconds = 180;
     });
 
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_remainingSeconds > 0) {
-        setState(() => _remainingSeconds--);
-      } else {
-        timer.cancel();
-        setState(() => _showQR = false);
+    try {
+      final response = await ApiService.dio.get('/license/generate-qr');
+      final String token = response.data['qrToken'];
+
+      setState(() {
+        _qrToken = token;
+        _isGeneratingQR = false;
+        _remainingSeconds = 180;
+      });
+
+      _timer?.cancel();
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (_remainingSeconds > 0) {
+          setState(() => _remainingSeconds--);
+        } else {
+          timer.cancel();
+          setState(() => _showQR = false);
+        }
+      });
+    } catch (e) {
+      setState(() {
+        _isGeneratingQR = false;
+        _showQR = false;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to generate QR Code. Check license status.'), backgroundColor: Colors.red),
+        );
       }
-    });
+    }
   }
 
   String get _formattedTime {
@@ -69,7 +114,46 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  String _formatDate(String? isoString) {
+    if (isoString == null || isoString.isEmpty) return '---';
+    try {
+      final date = DateTime.parse(isoString);
+      return '${date.day.toString().padLeft(2, '0')}.${date.month.toString().padLeft(2, '0')}.${date.year}';
+    } catch (e) {
+      return '---';
+    }
+  }
+
+  Widget _buildDetailText(String number, String value, {bool isBold = false}) {
+    return Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: number,
+            style: TextStyle(fontSize: 8.5, color: Colors.blueGrey[800], fontWeight: FontWeight.bold),
+          ),
+          TextSpan(
+            text: value,
+            style: TextStyle(fontSize: 9.5, fontWeight: isBold ? FontWeight.bold : FontWeight.w600, color: Colors.black87),
+          ),
+        ],
+      ),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
   Widget _buildFrontCard() {
+    final String name = _licenseData?['full_Name'] ?? 'N/A';
+    final String address = _licenseData?['address'] ?? 'N/A';
+    final String nicNo = _licenseData?['nic_No'] ?? 'N/A';
+    final String licenseNo = _licenseData?['license_No'] ?? 'N/A';
+    final String dob = _formatDate(_licenseData?['date_of_birth']);
+    final String bloodGroup = _licenseData?['blood_Group'] ?? '-';
+    final String issueDate = _formatDate(_licenseData?['issue_Date']);
+    final String status = _licenseData?['status'] ?? 'UNKNOWN';
+    final String? imageUrl = _licenseData?['image'];
+
     return Container(
       key: const ValueKey(true),
       width: double.infinity,
@@ -85,30 +169,6 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Stack(
         children: [
           Positioned.fill(
-            child: Opacity(
-              opacity: 0.12,
-              child: ShaderMask(
-                shaderCallback: (Rect bounds) {
-                  return const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Colors.black, Colors.transparent],
-                    stops: [0.3, 1.0],
-                  ).createShader(bounds);
-                },
-                blendMode: BlendMode.dstIn,
-                child: Image.asset(
-                  'assets/sadakadapahana.png',
-                  fit: BoxFit.cover,
-                  alignment: Alignment.topLeft,
-                  color: Colors.black,
-                  colorBlendMode: BlendMode.srcIn,
-                  errorBuilder: (c, e, s) => const SizedBox(),
-                ),
-              ),
-            ),
-          ),
-          Positioned.fill(
             child: Center(
               child: Opacity(
                 opacity: 0.08,
@@ -123,18 +183,16 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           Positioned(
-            bottom: 25,
-            right: 60,
+            bottom: 18,
+            right: 48,
             child: Opacity(
-              opacity: 0.25,
-              child: Container(
-                width: 35,
-                height: 45,
-                decoration: BoxDecoration(
-                  color: Colors.transparent,
-                  border: Border.all(color: Colors.grey.withValues(alpha: 0.4), width: 0.5),
-                ),
-                child: const Icon(Icons.person, size: 30, color: Colors.black),
+              opacity: 0.15,
+              child: Image.asset(
+                'assets/punkalasa.png',
+                width: 60,
+                color: Colors.black,
+                colorBlendMode: BlendMode.srcIn,
+                errorBuilder: (c, e, s) => const Icon(Icons.security, size: 50, color: Colors.black),
               ),
             ),
           ),
@@ -193,14 +251,87 @@ class _HomeScreenState extends State<HomeScreen> {
                             Container(
                               width: 70,
                               height: 85,
-                              decoration: BoxDecoration(
+                              decoration: const BoxDecoration(
                                 color: Colors.transparent,
-                                border: Border.all(color: Colors.grey.withValues(alpha: 0.4), width: 0.5),
                               ),
-                              child: const Icon(Icons.person, size: 55, color: Colors.black54),
+                              child: imageUrl != null && imageUrl.isNotEmpty
+                                  ? Image.network(
+                                imageUrl,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, size: 55, color: Colors.black54),
+                              )
+                                  : const Icon(Icons.person, size: 55, color: Colors.black54),
                             ),
                             const SizedBox(height: 4),
-                            Text('4a. $fakeIssueDate', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.black87)),
+                            Text('4a. $issueDate', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.black87)),
+                            const SizedBox(height: 12),
+                            Builder(
+                              builder: (context) {
+                                List<Color> statusGradient;
+                                Color glowColor;
+                                IconData statusIcon;
+
+                                if (status == 'ACTIVE') {
+                                  statusGradient = [const Color(0xFF00b09b), const Color(0xFF96c93d)];
+                                  glowColor = const Color(0xFF00b09b);
+                                  statusIcon = Icons.check_circle_rounded;
+                                } else if (status == 'SUSPENDED') {
+                                  statusGradient = [const Color(0xFFf12711), const Color(0xFFf5af19)];
+                                  glowColor = const Color(0xFFf12711);
+                                  statusIcon = Icons.warning_rounded;
+                                } else {
+                                  statusGradient = [const Color(0xFFcb2d3e), const Color(0xFFef473a)];
+                                  glowColor = const Color(0xFFcb2d3e);
+                                  statusIcon = Icons.cancel_rounded;
+                                }
+
+                                return ClipRRect(
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: BackdropFilter(
+                                    filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: statusGradient.map((c) => c.withValues(alpha: 0.8)).toList(),
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(20),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: glowColor.withValues(alpha: 0.4),
+                                            blurRadius: 4,
+                                            spreadRadius: 1,
+                                            offset: const Offset(0, 1),
+                                          ),
+                                        ],
+                                        border: Border.all(
+                                          color: Colors.white.withValues(alpha: 0.6),
+                                          width: 1.0,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(statusIcon, color: Colors.white, size: 11),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            status,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 9.5,
+                                              fontWeight: FontWeight.w900,
+                                              letterSpacing: 0.8,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                           ],
                         ),
                       ),
@@ -213,24 +344,26 @@ class _HomeScreenState extends State<HomeScreen> {
                             children: [
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  _buildDetailText('5. ', fakeLicenseNo, isBold: true),
-                                  _buildDetailText('4c. ', fakeNicNo),
+                                  Expanded(child: _buildDetailText('5. ', licenseNo, isBold: true)),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: _buildDetailText('4c. ', nicNo)),
                                 ],
                               ),
                               const SizedBox(height: 8),
-                              _buildDetailText('1, 2. ', fakeName),
+                              _buildDetailText('1, 2. ', name),
                               const SizedBox(height: 8),
-                              _buildDetailText('8. ', fakeAddress),
+                              _buildDetailText('8. ', address),
                               const SizedBox(height: 8),
-                              _buildDetailText('3. ', fakeDob),
+                              _buildDetailText('3. ', dob),
                               const Spacer(),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.start,
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
                                   const Text('Blood Group  ', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
-                                  Text(fakeBloodGroup, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
+                                  Text(bloodGroup, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87)),
                                   const Spacer(),
                                   const Text('SL', style: TextStyle(fontSize: 26, fontWeight: FontWeight.w900, color: Color(0xFF8E24AA))),
                                 ],
@@ -249,6 +382,25 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
+  }
+
+  TableRow _buildCategoryRow(String code, String icon) {
+    final categories = _licenseData?['vehicleCategories'] as List<dynamic>? ?? [];
+    final cat = categories.cast<Map<String, dynamic>>().firstWhere(
+          (c) => c['vehicle_Class'] == code,
+      orElse: () => <String, dynamic>{},
+    );
+
+    if (cat.isNotEmpty) {
+      return _buildTableRow(
+          '$code $icon',
+          _formatDate(cat['issue_Date']),
+          _formatDate(cat['expiry_Date']),
+          cat['restriction'] ?? '---'
+      );
+    } else {
+      return _buildTableRow('$code $icon', '---', '---', '---');
+    }
   }
 
   Widget _buildBackCard() {
@@ -336,20 +488,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       },
                       children: [
                         _buildTableRow('9.', '10.', '11.', '12.', isHeader: true),
-                        _buildTableRow('A1 🛺', '---', '---', '---'),
-                        _buildTableRow('A 🏍️', fakeIssueDate, fakeExpiryDate, '---'),
-                        _buildTableRow('B1 🛺', fakeIssueDate, fakeExpiryDate, '---'),
-                        _buildTableRow('B 🚗', fakeIssueDate, fakeExpiryDate, fakeRestriction),
-                        _buildTableRow('C1 🚚', '---', '---', '---'),
-                        _buildTableRow('C 🚛', '---', '---', '---'),
-                        _buildTableRow('CE 🚛', '---', '---', '---'),
-                        _buildTableRow('D1 🚐', '---', '---', '---'),
-                        _buildTableRow('D 🚌', '---', '---', '---'),
-                        _buildTableRow('DE 🚌', '---', '---', '---'),
-                        _buildTableRow('G1 🚜', '---', '---', '---'),
-                        _buildTableRow('G 🚜', '---', '---', '---'),
-                        _buildTableRow('J 🏗️', '---', '---', '---'),
-                        _buildTableRow('H ♿', '---', '---', '---'),
+                        _buildCategoryRow('A1', '🛺'),
+                        _buildCategoryRow('A', '🏍️'),
+                        _buildCategoryRow('B1', '🛺'),
+                        _buildCategoryRow('B', '🚗'),
+                        _buildCategoryRow('C1', '🚚'),
+                        _buildCategoryRow('C', '🚛'),
+                        _buildCategoryRow('CE', '🚛'),
+                        _buildCategoryRow('D1', '🚐'),
+                        _buildCategoryRow('D', '🚌'),
+                        _buildCategoryRow('DE', '🚌'),
+                        _buildCategoryRow('G1', '🚜'),
+                        _buildCategoryRow('G', '🚜'),
+                        _buildCategoryRow('J', '🏗️'),
+                        _buildCategoryRow('H', '♿'),
                       ],
                     ),
                   ),
@@ -396,24 +548,44 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildDetailText(String number, String value, {bool isBold = false}) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(number, style: TextStyle(fontSize: 8.5, color: Colors.blueGrey[800], fontWeight: FontWeight.bold)),
-        const SizedBox(width: 2),
-        Text(value, style: TextStyle(fontSize: 9.5, fontWeight: isBold ? FontWeight.bold : FontWeight.w600, color: Colors.black87)),
-      ],
-    );
-  }
-
   Widget _buildDashboard() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_errorMessage.isNotEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 60),
+              const SizedBox(height: 16),
+              Text(_errorMessage, textAlign: TextAlign.center, style: const TextStyle(fontSize: 16)),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _isLoading = true;
+                    _errorMessage = '';
+                  });
+                  _fetchLicenseData();
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          const SizedBox(height: 10),
           Text(
             _isFront ? 'Tap the card to see the back side' : 'Tap the card to see the front side',
             style: const TextStyle(color: Colors.grey, fontSize: 12, fontStyle: FontStyle.italic),
@@ -462,8 +634,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 5))],
                   ),
-                  child: QrImageView(
-                    data: 'SECURE_TOKEN_$fakeNicNo',
+                  child: _isGeneratingQR
+                      ? const SizedBox(
+                      height: 200,
+                      width: 200,
+                      child: Center(child: CircularProgressIndicator())
+                  )
+                      : QrImageView(
+                    data: _qrToken,
                     version: QrVersions.auto,
                     size: 200.0,
                     eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF1A2980)),
@@ -507,6 +685,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ? const Center(child: Text('Fines Screen Coming Soon!'))
           : const Center(child: Text('Profile Screen Coming Soon!')),
       bottomNavigationBar: NavigationBar(
+        height: 65,
         selectedIndex: _currentIndex,
         onDestinationSelected: (index) => setState(() => _currentIndex = index),
         destinations: const [

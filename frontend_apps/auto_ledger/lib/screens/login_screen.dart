@@ -18,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _isBiometricEnabled = false;
+  bool _obscurePassword = true;
 
   @override
   void initState() {
@@ -32,42 +33,56 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  Future<void> _handleLogin() async {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const HomeScreen()),
+  void _showToast(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(isError ? Icons.error_outline : Icons.check_circle_outline, color: Colors.white),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+          ],
+        ),
+        backgroundColor: isError ? Colors.redAccent : Colors.green.shade600,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.all(16),
+        elevation: 6,
+        duration: const Duration(seconds: 3),
+      ),
     );
   }
 
-  // Future<void> _handleLogin() async {
-  //   setState(() => _isLoading = true);
-  //   try {
-  //     final deviceId = await DeviceInfoUtil.getDeviceId();
-  //     final success = await AuthService.loginUser(
-  //       _nicController.text.trim(),
-  //       _passwordController.text.trim(),
-  //       deviceId,
-  //     );
-  //
-  //     if (success && mounted) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(content: Text('Login Successful!')),
-  //       );
-  //       Navigator.pushReplacement(
-  //         context,
-  //         MaterialPageRoute(builder: (_) => const HomeScreen()),
-  //       );
-  //     }
-  //   } catch (e) {
-  //     if (mounted) {
-  //       ScaffoldMessenger.of(context).showSnackBar(
-  //         const SnackBar(content: Text('Login Failed. Check credentials or device.')),
-  //       );
-  //     }
-  //   } finally {
-  //     if (mounted) setState(() => _isLoading = false);
-  //   }
-  // }
+  Future<void> _handleLogin() async {
+    if (_nicController.text.trim().isEmpty || _passwordController.text.trim().isEmpty) {
+      _showToast('Please enter both NIC and Password', isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final deviceId = await DeviceInfoUtil.getDeviceId();
+      final success = await AuthService.loginUser(
+        _nicController.text.trim(),
+        _passwordController.text.trim(),
+        deviceId,
+      );
+
+      if (success && mounted) {
+        _showToast('Login Successful!');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _showToast('Login Failed. Check credentials or device.', isError: true);
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -119,11 +134,22 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 16),
                   TextField(
                     controller: _passwordController,
-                    obscureText: true,
+                    obscureText: _obscurePassword,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
                       labelText: 'Password',
                       labelStyle: const TextStyle(color: Colors.white70),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                          color: Colors.white70,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
+                      ),
                       enabledBorder: OutlineInputBorder(
                         borderSide: const BorderSide(color: Colors.white54),
                         borderRadius: BorderRadius.circular(12),
@@ -161,9 +187,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     IconButton(
                       icon: const Icon(Icons.fingerprint, color: Colors.white, size: 40),
                       onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Biometric Login Coming Soon!')),
-                        );
+                        _showToast('Biometric Login Coming Soon!', isError: false);
                       },
                     ),
                   TextButton(

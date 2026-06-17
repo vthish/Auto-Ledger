@@ -20,6 +20,7 @@ dependencies:
   qr_flutter: ^4.1.0
   google_fonts: ^6.2.1
   flutter_dotenv: ^6.0.1
+  firebase_auth: ^6.5.2
 
 dev_dependencies:
   flutter_test:
@@ -32,4 +33,5 @@ flutter:
   assets:
     - assets/flag.png
     - assets/emblem.png
+    - assets/punkalasa.png
     - .env

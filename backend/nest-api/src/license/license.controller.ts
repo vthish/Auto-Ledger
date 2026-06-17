@@ -152,6 +152,14 @@ export class LicenseController {
     });
   }
 
+  @Get('get-upload-url')
+  async getUploadUrl(
+    @Query('fileName') fileName: string,
+    @Query('fileType') fileType: string,
+  ) {
+    return this.licenseService.getS3UploadUrl(fileName, fileType);
+  }
+
   @ApiOperation({ summary: 'Get current user active license' })
   @Get('my-license')
   async getMyLicense(@Request() req: AuthRequest) {
