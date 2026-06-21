@@ -28,6 +28,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _remainingSeconds = 180;
   Timer? _timer;
 
+  bool _hasShownPointsWarning = false;
+
   @override
   void initState() {
     super.initState();
@@ -43,21 +45,211 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchLicenseData() async {
     try {
       final response = await ApiService.dio.get('/license/my-license');
+      if (!mounted) return;
+
       setState(() {
-        _licenseData = response.data;
+        _licenseData = Map<String, dynamic>.from(response.data);
+
+        _licenseData!['points'] = 65;
+        _licenseData!['status'] = 'SUSPENDED';
+        _licenseData!['temporaryLicenses'] = [
+          {
+            'issue_Date': DateTime.now().toIso8601String(),
+            'expiry_Date': DateTime.now().add(const Duration(days: 14)).toIso8601String(),
+            'issued_By': 'Officer Kamal (Badge: 4567)'
+          }
+        ];
+
         _isLoading = false;
       });
+
+      if (!_hasShownPointsWarning) {
+        final points = _licenseData?['points'] ?? 0;
+        if (points >= 24) {
+          _hasShownPointsWarning = true;
+          Future.microtask(() => _showPointsWarning(points));
+        }
+      }
     } on DioException catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = e.response?.data['message'] ?? 'Failed to load license details.';
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'An unexpected error occurred.';
         _isLoading = false;
       });
     }
+  }
+
+  void _showPointsWarning(int points) {
+    Color warningColor;
+    IconData warningIcon;
+    String warningTitle;
+    String warningMessage;
+
+    if (points >= 100) {
+      warningColor = Colors.redAccent;
+      warningIcon = Icons.cancel;
+      warningTitle = 'CRITICAL WARNING';
+      warningMessage = 'Your driving license has been revoked. You have accumulated $points demerit points.';
+    } else if (points >= 50) {
+      warningColor = Colors.orangeAccent;
+      warningIcon = Icons.warning_rounded;
+      warningTitle = 'SEVERE WARNING';
+      warningMessage = 'Your driving license is suspended for 6 months. You have $points demerit points.';
+    } else {
+      warningColor = Colors.amber;
+      warningIcon = Icons.info_outline_rounded;
+      warningTitle = 'WARNING';
+      warningMessage = 'You have high demerit points ($points points). Reach 50 points and your license will be suspended.';
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+          child: Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            elevation: 0,
+            backgroundColor: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.rectangle,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: const [
+                  BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 10)),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    backgroundColor: warningColor.withOpacity(0.2),
+                    radius: 40,
+                    child: Icon(warningIcon, size: 40, color: warningColor),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    warningTitle,
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: warningColor),
+                  ),
+                  const SizedBox(height: 15),
+                  Text(
+                    warningMessage,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 16, color: Colors.black87),
+                  ),
+                  const SizedBox(height: 25),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 45,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1A2980),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('I Understand', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _showTemporaryLicenseSheet(Map<String, dynamic> tempLicense) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 50,
+                    height: 5,
+                    decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Row(
+                  children: [
+                    Icon(Icons.assignment_late_outlined, color: Color(0xFF1A2980), size: 28),
+                    SizedBox(width: 10),
+                    Text(
+                      'Temporary Permit',
+                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1A2980)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                _buildTempInfoRow('Issued Date', _formatDate(tempLicense['issue_Date'])),
+                const Divider(height: 20),
+                _buildTempInfoRow('Valid Until', _formatDate(tempLicense['expiry_Date']), isHighlight: true),
+                const Divider(height: 20),
+                _buildTempInfoRow('Issued By (Officer)', tempLicense['issued_By'] ?? 'Unknown'),
+                const SizedBox(height: 30),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.grey[200],
+                      foregroundColor: Colors.black87,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Close', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTempInfoRow(String title, String value, {bool isHighlight = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(title, style: const TextStyle(fontSize: 15, color: Colors.black54)),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: isHighlight ? Colors.redAccent : Colors.black87,
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _generateQR() async {
@@ -161,9 +353,9 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFFEAF5E1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+        border: Border.all(color: Colors.grey.withOpacity(0.3)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 5)),
+          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 5)),
         ],
       ),
       child: Stack(
@@ -224,7 +416,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             margin: const EdgeInsets.symmetric(vertical: 2),
                             height: 1.0,
                             width: double.infinity,
-                            color: Colors.grey.withValues(alpha: 0.4),
+                            color: Colors.grey.withOpacity(0.4),
                           ),
                           const Text('DEMOCRATIC SOCIALIST REPUBLIC OF SRI LANKA', textAlign: TextAlign.center, style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, color: Color(0xFF0D47A1))),
                         ],
@@ -293,21 +485,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
-                                          colors: statusGradient.map((c) => c.withValues(alpha: 0.8)).toList(),
+                                          colors: statusGradient.map((c) => c.withOpacity(0.8)).toList(),
                                           begin: Alignment.topLeft,
                                           end: Alignment.bottomRight,
                                         ),
                                         borderRadius: BorderRadius.circular(20),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: glowColor.withValues(alpha: 0.4),
+                                            color: glowColor.withOpacity(0.4),
                                             blurRadius: 4,
                                             spreadRadius: 1,
                                             offset: const Offset(0, 1),
                                           ),
                                         ],
                                         border: Border.all(
-                                          color: Colors.white.withValues(alpha: 0.6),
+                                          color: Colors.white.withOpacity(0.6),
                                           width: 1.0,
                                         ),
                                       ),
@@ -403,6 +595,40 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  Widget _buildLegendText(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2.5),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 6.0, color: Colors.blueGrey[800], fontWeight: FontWeight.w600, height: 1.0),
+      ),
+    );
+  }
+
+  TableRow _buildTableRow(String col1, String col2, String col3, String restriction, {bool isHeader = false}) {
+    return TableRow(
+      decoration: BoxDecoration(color: isHeader ? Colors.grey.withOpacity(0.2) : Colors.transparent),
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 1.0, horizontal: 1.0),
+          child: Text(col1, textAlign: TextAlign.center, style: TextStyle(fontSize: isHeader ? 7.5 : 8.5, fontWeight: isHeader ? FontWeight.bold : FontWeight.normal)),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 1.0, horizontal: 1.0),
+          child: Text(col2, textAlign: TextAlign.center, style: TextStyle(fontSize: isHeader ? 7.5 : 8.5, fontWeight: isHeader ? FontWeight.bold : FontWeight.normal)),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 1.0, horizontal: 1.0),
+          child: Text(col3, textAlign: TextAlign.center, style: TextStyle(fontSize: isHeader ? 7.5 : 8.5, fontWeight: isHeader ? FontWeight.bold : FontWeight.normal)),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 1.0, horizontal: 1.0),
+          child: Text(restriction, textAlign: TextAlign.center, style: TextStyle(fontSize: isHeader ? 7.5 : 8.5, fontWeight: isHeader ? FontWeight.bold : FontWeight.normal)),
+        ),
+      ],
+    );
+  }
+
   Widget _buildBackCard() {
     return Container(
       key: const ValueKey(false),
@@ -411,9 +637,9 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         color: const Color(0xFFEAF5E1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+        border: Border.all(color: Colors.grey.withOpacity(0.3)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10, offset: const Offset(0, 5)),
+          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 5)),
         ],
       ),
       child: Stack(
@@ -479,7 +705,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Table(
-                      border: TableBorder.all(color: Colors.black.withValues(alpha: 0.3), width: 0.5),
+                      border: TableBorder.all(color: Colors.black.withOpacity(0.3), width: 0.5),
                       columnWidths: const {
                         0: FlexColumnWidth(1.2),
                         1: FlexColumnWidth(2.2),
@@ -511,40 +737,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildLegendText(String text) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 2.5),
-      child: Text(
-        text,
-        style: TextStyle(fontSize: 6.0, color: Colors.blueGrey[800], fontWeight: FontWeight.w600, height: 1.0),
-      ),
-    );
-  }
-
-  TableRow _buildTableRow(String col1, String col2, String col3, String restriction, {bool isHeader = false}) {
-    return TableRow(
-      decoration: BoxDecoration(color: isHeader ? Colors.grey.withValues(alpha: 0.2) : Colors.transparent),
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 1.0, horizontal: 1.0),
-          child: Text(col1, textAlign: TextAlign.center, style: TextStyle(fontSize: isHeader ? 7.5 : 8.5, fontWeight: isHeader ? FontWeight.bold : FontWeight.normal)),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 1.0, horizontal: 1.0),
-          child: Text(col2, textAlign: TextAlign.center, style: TextStyle(fontSize: isHeader ? 7.5 : 8.5, fontWeight: isHeader ? FontWeight.bold : FontWeight.normal)),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 1.0, horizontal: 1.0),
-          child: Text(col3, textAlign: TextAlign.center, style: TextStyle(fontSize: isHeader ? 7.5 : 8.5, fontWeight: isHeader ? FontWeight.bold : FontWeight.normal)),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 1.0, horizontal: 1.0),
-          child: Text(restriction, textAlign: TextAlign.center, style: TextStyle(fontSize: isHeader ? 7.5 : 8.5, fontWeight: isHeader ? FontWeight.bold : FontWeight.normal)),
-        ),
-      ],
     );
   }
 
@@ -580,8 +772,11 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
+    final List<dynamic> tempLicenses = _licenseData?['temporaryLicenses'] ?? [];
+    final bool hasTempLicense = tempLicenses.isNotEmpty;
+
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0, bottom: 90.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -606,6 +801,26 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
           const SizedBox(height: 32),
+
+          if (hasTempLicense) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 55,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orangeAccent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 2,
+                ),
+                icon: const Icon(Icons.assignment_late_outlined, size: 28),
+                label: const Text('VIEW TEMPORARY LICENSE', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                onPressed: () => _showTemporaryLicenseSheet(tempLicenses.last as Map<String, dynamic>),
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
           if (!_showQR)
             SizedBox(
               width: double.infinity,
@@ -632,7 +847,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 10, offset: const Offset(0, 5))],
+                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 5))],
                   ),
                   child: _isGeneratingQR
                       ? const SizedBox(
@@ -667,9 +882,39 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildNavItem(int index, String title, IconData icon) {
+    bool isSelected = _currentIndex == index;
+    return GestureDetector(
+      onTap: () => setState(() => _currentIndex = index),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white.withOpacity(0.15) : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: isSelected ? Colors.white : Colors.grey, size: 22),
+            if (isSelected) ...[
+              const SizedBox(width: 8),
+              Text(
+                  title,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)
+              ),
+            ]
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBody: true,
       appBar: AppBar(
         backgroundColor: const Color(0xFF1A2980),
         foregroundColor: Colors.white,
@@ -684,15 +929,30 @@ class _HomeScreenState extends State<HomeScreen> {
           : _currentIndex == 1
           ? const Center(child: Text('Fines Screen Coming Soon!'))
           : const Center(child: Text('Profile Screen Coming Soon!')),
-      bottomNavigationBar: NavigationBar(
-        height: 65,
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) => setState(() => _currentIndex = index),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.credit_card), label: 'License'),
-          NavigationDestination(icon: Icon(Icons.receipt_long), label: 'Fines'),
-          NavigationDestination(icon: Icon(Icons.person), label: 'Profile'),
-        ],
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          margin: const EdgeInsets.only(bottom: 16, left: 30, right: 30),
+          height: 60,
+          decoration: BoxDecoration(
+              color: const Color(0xFF212121),
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                )
+              ]
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildNavItem(0, 'License', Icons.credit_card),
+              _buildNavItem(1, 'Fines', Icons.receipt_long),
+              _buildNavItem(2, 'Profile', Icons.person),
+            ],
+          ),
+        ),
       ),
     );
   }
