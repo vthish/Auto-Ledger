@@ -22,24 +22,12 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isLoading = true;
   String _errorMessage = '';
 
-  bool _showQR = false;
-  bool _isGeneratingQR = false;
-  String _qrToken = '';
-  int _remainingSeconds = 180;
-  Timer? _timer;
-
   bool _hasShownPointsWarning = false;
 
   @override
   void initState() {
     super.initState();
     _fetchLicenseData();
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
   }
 
   Future<void> _fetchLicenseData() async {
@@ -111,57 +99,56 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.7),
       builder: (BuildContext context) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-          child: Dialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            elevation: 0,
-            backgroundColor: Colors.transparent,
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.rectangle,
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: const [
-                  BoxShadow(color: Colors.black26, blurRadius: 10, offset: Offset(0, 10)),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircleAvatar(
-                    backgroundColor: warningColor.withOpacity(0.2),
-                    radius: 40,
-                    child: Icon(warningIcon, size: 40, color: warningColor),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    warningTitle,
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: warningColor),
-                  ),
-                  const SizedBox(height: 15),
-                  Text(
-                    warningMessage,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16, color: Colors.black87),
-                  ),
-                  const SizedBox(height: 25),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 45,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1A2980),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('I Understand', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
+          elevation: 10,
+          backgroundColor: Colors.transparent,
+          child: Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.rectangle,
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: const [
+                BoxShadow(color: Colors.black26, blurRadius: 20, offset: Offset(0, 10)),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircleAvatar(
+                  backgroundColor: warningColor.withOpacity(0.2),
+                  radius: 40,
+                  child: Icon(warningIcon, size: 40, color: warningColor),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  warningTitle,
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: warningColor),
+                ),
+                const SizedBox(height: 15),
+                Text(
+                  warningMessage,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 16, color: Colors.black87, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 25),
+                SizedBox(
+                  width: double.infinity,
+                  height: 50,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A2980),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      elevation: 0,
                     ),
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('I Understand', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
         );
@@ -176,12 +163,13 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
         return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
           child: Container(
             padding: const EdgeInsets.all(24),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.only(topLeft: Radius.circular(25), topRight: Radius.circular(25)),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.3),
+              borderRadius: const BorderRadius.only(topLeft: Radius.circular(35), topRight: Radius.circular(35)),
+              border: Border.all(color: Colors.white.withOpacity(0.5), width: 1.5),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -191,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Container(
                     width: 50,
                     height: 5,
-                    decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(10)),
+                    decoration: BoxDecoration(color: Colors.grey[600], borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -200,26 +188,29 @@ class _HomeScreenState extends State<HomeScreen> {
                     Icon(Icons.assignment_late_outlined, color: Color(0xFF1A2980), size: 28),
                     SizedBox(width: 10),
                     Text(
-                      'Temporary Permit',
+                      'Temporary License',
                       style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1A2980)),
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
                 _buildTempInfoRow('Issued Date', _formatDate(tempLicense['issue_Date'])),
-                const Divider(height: 20),
+                const Divider(height: 20, color: Colors.black26),
                 _buildTempInfoRow('Valid Until', _formatDate(tempLicense['expiry_Date']), isHighlight: true),
-                const Divider(height: 20),
+                const Divider(height: 20, color: Colors.black26),
                 _buildTempInfoRow('Issued By (Officer)', tempLicense['issued_By'] ?? 'Unknown'),
                 const SizedBox(height: 30),
                 SizedBox(
                   width: double.infinity,
-                  height: 50,
+                  height: 55,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.grey[200],
+                      backgroundColor: Colors.white.withOpacity(0.5),
                       foregroundColor: Colors.black87,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        side: BorderSide(color: Colors.white.withOpacity(0.6), width: 1.2),
+                      ),
                       elevation: 0,
                     ),
                     onPressed: () => Navigator.pop(context),
@@ -239,13 +230,13 @@ class _HomeScreenState extends State<HomeScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(title, style: const TextStyle(fontSize: 15, color: Colors.black54)),
+        Text(title, style: const TextStyle(fontSize: 15, color: Colors.black87, fontWeight: FontWeight.w600)),
         Text(
           value,
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: isHighlight ? Colors.redAccent : Colors.black87,
+            color: isHighlight ? Colors.redAccent.shade700 : Colors.black87,
           ),
         ),
       ],
@@ -253,47 +244,35 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _generateQR() async {
-    setState(() {
-      _isGeneratingQR = true;
-      _showQR = true;
-    });
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator(color: Colors.white)),
+    );
 
     try {
       final response = await ApiService.dio.get('/license/generate-qr');
       final String token = response.data['qrToken'];
 
-      setState(() {
-        _qrToken = token;
-        _isGeneratingQR = false;
-        _remainingSeconds = 180;
-      });
+      if (mounted) Navigator.pop(context);
 
-      _timer?.cancel();
-      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-        if (_remainingSeconds > 0) {
-          setState(() => _remainingSeconds--);
-        } else {
-          timer.cancel();
-          setState(() => _showQR = false);
-        }
-      });
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext context) {
+            return _QRDialog(qrToken: token);
+          },
+        );
+      }
     } catch (e) {
-      setState(() {
-        _isGeneratingQR = false;
-        _showQR = false;
-      });
+      if (mounted) Navigator.pop(context);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to generate QR Code. Check license status.'), backgroundColor: Colors.red),
         );
       }
     }
-  }
-
-  String get _formattedTime {
-    int minutes = _remainingSeconds ~/ 60;
-    int seconds = _remainingSeconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
   Future<void> _logout() async {
@@ -740,6 +719,47 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildGlassButton({
+    required String label,
+    required IconData icon,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: InkWell(
+          onTap: onPressed,
+          child: Container(
+            width: double.infinity,
+            height: 60,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.75),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 5),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 26, color: Colors.white),
+                const SizedBox(width: 12),
+                Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildDashboard() {
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -783,7 +803,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 10),
           Text(
             _isFront ? 'Tap the card to see the back side' : 'Tap the card to see the front side',
-            style: const TextStyle(color: Colors.grey, fontSize: 12, fontStyle: FontStyle.italic),
+            style: const TextStyle(color: Colors.blueGrey, fontSize: 13, fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           GestureDetector(
@@ -803,80 +823,21 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 32),
 
           if (hasTempLicense) ...[
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.orangeAccent,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 2,
-                ),
-                icon: const Icon(Icons.assignment_late_outlined, size: 28),
-                label: const Text('VIEW TEMPORARY LICENSE', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                onPressed: () => _showTemporaryLicenseSheet(tempLicenses.last as Map<String, dynamic>),
-              ),
+            _buildGlassButton(
+              label: 'VIEW TEMPORARY LICENSE',
+              icon: Icons.assignment_late_outlined,
+              color: Colors.orangeAccent.shade700,
+              onPressed: () => _showTemporaryLicenseSheet(tempLicenses.last as Map<String, dynamic>),
             ),
             const SizedBox(height: 16),
           ],
 
-          if (!_showQR)
-            SizedBox(
-              width: double.infinity,
-              height: 55,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1A2980),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  elevation: 5,
-                ),
-                icon: const Icon(Icons.qr_code_scanner, size: 28),
-                label: const Text('SHOW QR TO OFFICER', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                onPressed: _generateQR,
-              ),
-            )
-          else
-            Column(
-              children: [
-                const Text('Scan within the time limit', style: TextStyle(color: Colors.grey, fontSize: 14)),
-                const SizedBox(height: 16),
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 5))],
-                  ),
-                  child: _isGeneratingQR
-                      ? const SizedBox(
-                      height: 200,
-                      width: 200,
-                      child: Center(child: CircularProgressIndicator())
-                  )
-                      : QrImageView(
-                    data: _qrToken,
-                    version: QrVersions.auto,
-                    size: 200.0,
-                    eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF1A2980)),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  _formattedTime,
-                  style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.redAccent),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: () {
-                    _timer?.cancel();
-                    setState(() => _showQR = false);
-                  },
-                  child: const Text('Close QR', style: TextStyle(fontSize: 16)),
-                )
-              ],
-            ),
+          _buildGlassButton(
+            label: 'SHOW QR TO OFFICER',
+            icon: Icons.qr_code_scanner,
+            color: const Color(0xFF1A2980),
+            onPressed: _generateQR,
+          ),
         ],
       ),
     );
@@ -891,13 +852,13 @@ class _HomeScreenState extends State<HomeScreen> {
         curve: Curves.easeInOut,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white.withOpacity(0.15) : Colors.transparent,
+          color: isSelected ? Colors.white.withOpacity(0.2) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: isSelected ? Colors.white : Colors.grey, size: 22),
+            Icon(icon, color: isSelected ? Colors.white : Colors.white70, size: 22),
             if (isSelected) ...[
               const SizedBox(width: 8),
               Text(
@@ -911,45 +872,209 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildGlassBackground() {
+    return Stack(
+      children: [
+        Container(
+          color: const Color(0xFFF0F4FF),
+        ),
+        Positioned(
+          top: -50,
+          left: -50,
+          child: Container(
+            width: 250,
+            height: 250,
+            decoration: BoxDecoration(
+              color: const Color(0xFF1A2980).withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: 100,
+          right: -50,
+          child: Container(
+            width: 250,
+            height: 250,
+            decoration: BoxDecoration(
+              color: Colors.greenAccent.withOpacity(0.2),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+            child: Container(color: Colors.transparent),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true,
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1A2980),
-        foregroundColor: Colors.white,
-        title: const Text('Auto-Ledger Dashboard', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-        elevation: 0,
-        actions: [
-          IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
-        ],
-      ),
-      body: _currentIndex == 0
-          ? _buildDashboard()
-          : _currentIndex == 1
-          ? const Center(child: Text('Fines Screen Coming Soon!'))
-          : const Center(child: Text('Profile Screen Coming Soon!')),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 16, left: 30, right: 30),
-          height: 60,
-          decoration: BoxDecoration(
-              color: const Color(0xFF212121),
-              borderRadius: BorderRadius.circular(30),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 10,
-                  offset: const Offset(0, 5),
-                )
-              ]
+    return Stack(
+      children: [
+        _buildGlassBackground(),
+        Scaffold(
+          backgroundColor: Colors.transparent,
+          extendBody: true,
+          extendBodyBehindAppBar: true,
+          appBar: AppBar(
+            backgroundColor: const Color(0xFF1A2980).withOpacity(0.85),
+            flexibleSpace: ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(color: Colors.transparent),
+              ),
+            ),
+            foregroundColor: Colors.white,
+            title: const Text('Auto-Ledger Dashboard', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+            elevation: 0,
+            actions: [
+              IconButton(icon: const Icon(Icons.logout), onPressed: _logout),
+            ],
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          body: SafeArea(
+            child: _currentIndex == 0
+                ? _buildDashboard()
+                : _currentIndex == 1
+                ? const Center(child: Text('Fines Screen Coming Soon!'))
+                : const Center(child: Text('Profile Screen Coming Soon!')),
+          ),
+          bottomNavigationBar: SafeArea(
+            child: Container(
+              margin: const EdgeInsets.only(bottom: 16, left: 30, right: 30),
+              height: 65,
+              decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(35),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    )
+                  ]
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(35),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                  child: Container(
+                    color: const Color(0xFF1A2980).withOpacity(0.85),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildNavItem(0, 'License', Icons.credit_card),
+                        _buildNavItem(1, 'Fines', Icons.receipt_long),
+                        _buildNavItem(2, 'Profile', Icons.person),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QRDialog extends StatefulWidget {
+  final String qrToken;
+  const _QRDialog({required this.qrToken});
+
+  @override
+  State<_QRDialog> createState() => _QRDialogState();
+}
+
+class _QRDialogState extends State<_QRDialog> {
+  int _remainingSeconds = 180;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_remainingSeconds > 0) {
+        setState(() => _remainingSeconds--);
+      } else {
+        timer.cancel();
+        if (mounted) Navigator.pop(context);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  String get _formattedTime {
+    int minutes = _remainingSeconds ~/ 60;
+    int seconds = _remainingSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BackdropFilter(
+      filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.25),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: Colors.white.withOpacity(0.5), width: 1.5),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 25, offset: const Offset(0, 10))
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              _buildNavItem(0, 'License', Icons.credit_card),
-              _buildNavItem(1, 'Fines', Icons.receipt_long),
-              _buildNavItem(2, 'Profile', Icons.person),
+              const Text('Show this to the Officer', style: TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white.withOpacity(0.8), width: 2)
+                ),
+                child: QrImageView(
+                  data: widget.qrToken,
+                  version: QrVersions.auto,
+                  size: 200.0,
+                  eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF1A2980)),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(_formattedTime, style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+              const SizedBox(height: 15),
+              SizedBox(
+                width: double.infinity,
+                height: 55,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white.withOpacity(0.5),
+                    foregroundColor: Colors.black87,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                      side: BorderSide(color: Colors.white.withOpacity(0.6), width: 1.2),
+                    ),
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Close', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+              )
             ],
           ),
         ),
