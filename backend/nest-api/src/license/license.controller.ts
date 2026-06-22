@@ -172,6 +172,12 @@ export class LicenseController {
     return this.licenseService.generateLicenseQR(req.user.id);
   }
 
+  @ApiOperation({ summary: 'Check if QR code has been scanned' })
+  @Get('check-scan-status')
+  async checkScanStatus(@Query('qrToken') qrToken: string) {
+    return this.licenseService.checkScanStatus(qrToken);
+  }
+
   @Roles('TRAFFIC_OFFICER')
   @ApiOperation({ summary: 'Scan License QR Code' })
   @Post('scan-qr')
