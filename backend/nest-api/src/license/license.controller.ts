@@ -189,6 +189,7 @@ export class LicenseController {
     );
   }
 
+  @Roles('DMT_ADMIN')
   @ApiOperation({ summary: 'Update License Status' })
   @Patch(':id/status')
   async updateStatus(@Param('id') id: string, @Body() data: UpdateStatusDto) {
