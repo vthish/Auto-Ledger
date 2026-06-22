@@ -223,6 +223,16 @@ export class LicenseService {
     return { qrToken };
   }
 
+  async checkScanStatus(qrToken: string) {
+    if (!qrToken) throw new BadRequestException();
+
+    const scan = await this.prisma.qR_Scan_History.findFirst({
+      where: { qr_Token: qrToken },
+    });
+
+    return { scanned: !!scan };
+  }
+
   async scanLicenseQR(
     qrToken: string,
     trafficOfficerId: string,

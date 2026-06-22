@@ -830,7 +830,7 @@ class _HomeScreenState extends State<HomeScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-              color: Colors.white.withAlpha(150), // Color opacity wadi kara (115 idan 150 ta)
+              color: Colors.white.withAlpha(150),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(color: Colors.white.withAlpha(153), width: 1.5),
               boxShadow: [
@@ -1141,12 +1141,44 @@ class _QRDialog extends StatefulWidget {
 
 class _QRDialogState extends State<_QRDialog> {
   int _remainingSeconds = 180;
-  Timer? _timer;
+  Timer? _pollingTimer;
+  Timer? _countdownTimer;
+  bool _isScanned = false;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _startPolling();
+  }
+
+  @override
+  void dispose() {
+    _pollingTimer?.cancel();
+    _countdownTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 3), (timer) async {
+      try {
+        final response = await ApiService.dio.get('/license/check-scan-status', queryParameters: {'qrToken': widget.qrToken});
+        if (response.data['scanned'] == true) {
+          timer.cancel();
+          _onQrScanned();
+        }
+      } catch (e) {
+        // Ignored for polling
+      }
+    });
+  }
+
+  void _onQrScanned() {
+    if (!mounted || _isScanned) return;
+    setState(() {
+      _isScanned = true;
+    });
+
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingSeconds > 0) {
         setState(() => _remainingSeconds--);
       } else {
@@ -1154,12 +1186,6 @@ class _QRDialogState extends State<_QRDialog> {
         if (mounted) Navigator.pop(context);
       }
     });
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
   }
 
   String get _formattedTime {
@@ -1182,32 +1208,45 @@ class _QRDialogState extends State<_QRDialog> {
             borderRadius: BorderRadius.circular(30),
             border: Border.all(color: Colors.white.withAlpha(128), width: 1.5),
             boxShadow: [
-              BoxShadow(color: Colors.black.withAlpha(26), blurRadius: 25, offset: const Offset(0, 10))
+              BoxShadow(
+                  color: Colors.black.withAlpha(26),
+                  blurRadius: 25,
+                  offset: const Offset(0, 10))
             ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Show this to the Officer', style: TextStyle(color: Colors.black87, fontSize: 18, fontWeight: FontWeight.bold)),
+              const Text('Show this to the Officer',
+                  style: TextStyle(
+                      color: Colors.black87,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                     color: Colors.white.withAlpha(102),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withAlpha(153), width: 2)
-                ),
+                    border: Border.all(
+                        color: Colors.white.withAlpha(153), width: 2)),
                 child: QrImageView(
                   data: widget.qrToken,
                   version: QrVersions.auto,
                   size: 200.0,
-                  eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Color(0xFF1A2980)),
+                  eyeStyle: const QrEyeStyle(
+                      eyeShape: QrEyeShape.square, color: Color(0xFF1A2980)),
                 ),
               ),
               const SizedBox(height: 20),
-              Text(_formattedTime, style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.red.shade900)),
+              Text(
+                _isScanned ? _formattedTime : '03:00',
+                style: TextStyle(
+                    fontSize: 36,
+                    fontWeight: FontWeight.bold,
+                    color: _isScanned ? Colors.red.shade900 : Colors.black87),
+              ),
               const SizedBox(height: 15),
-
               ClipRRect(
                 borderRadius: BorderRadius.circular(15),
                 child: BackdropFilter(
@@ -1217,18 +1256,21 @@ class _QRDialogState extends State<_QRDialog> {
                     height: 50,
                     child: ElevatedButton(
                       style: ButtonStyle(
-                        backgroundColor: WidgetStateProperty.resolveWith<Color>((states) {
+                        backgroundColor:
+                        WidgetStateProperty.resolveWith<Color>((states) {
                           if (states.contains(WidgetState.pressed)) {
                             return Colors.grey.shade400.withAlpha(153);
                           }
                           return Colors.white.withAlpha(51);
                         }),
-                        foregroundColor: WidgetStateProperty.all(Colors.black87),
+                        foregroundColor:
+                        WidgetStateProperty.all(Colors.black87),
                         elevation: WidgetStateProperty.all(0),
                         shape: WidgetStateProperty.all(
                           RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(15),
-                            side: BorderSide(color: Colors.white.withAlpha(102), width: 1.5),
+                            side: BorderSide(
+                                color: Colors.white.withAlpha(102), width: 1.5),
                           ),
                         ),
                         overlayColor: WidgetStateProperty.all(Colors.black12),
@@ -1237,7 +1279,9 @@ class _QRDialogState extends State<_QRDialog> {
                         HapticFeedback.mediumImpact();
                         Navigator.pop(context);
                       },
-                      child: const Text('Close', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      child: const Text('Close',
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
                 ),
