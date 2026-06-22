@@ -549,4 +549,18 @@ export class FinesService {
 
     return stats;
   }
+
+  async getOfficerFines(officerId: string) {
+    return this.prisma.fine.findMany({
+      where: { traffic_Officer_Id: officerId },
+      include: {
+        license: {
+          select: { license_No: true, full_Name: true, nic_No: true },
+        },
+        offenses: { include: { offenceCategory: true } },
+        payment: true,
+      },
+      orderBy: { issue_At: 'desc' },
+    });
+  }
 }

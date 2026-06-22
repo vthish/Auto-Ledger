@@ -50,6 +50,13 @@ export class FinesController {
     return this.finesService.getTrafficOfficerStats(req.user.id);
   }
 
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('TRAFFIC_OFFICER')
+  @Get('officer-fines')
+  async getOfficerFines(@Request() req: AuthRequest) {
+    return this.finesService.getOfficerFines(req.user.id);
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('my-fines')
   getMyFines(@Request() req: AuthRequest) {
