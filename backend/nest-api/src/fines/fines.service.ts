@@ -41,8 +41,27 @@ export class FinesService {
   private async autoActivateLicenses() {
     await this.prisma.driving_License.updateMany({
       where: { status: 'SUSPENDED', suspended_Until: { lte: new Date() } },
-      data: { status: 'ACTIVE', suspended_Until: null, points: 0 },
+      data: { status: 'ACTIVE', suspended_Until: null },
     });
+
+    const licensesToActivate = await this.prisma.driving_License.findMany({
+      where: {
+        status: 'SUSPENDED',
+        suspended_Until: null,
+        fines: {
+          none: { status: { in: ['PENDING', 'OVERDUE', 'COURT_CASE'] } },
+        },
+      },
+    });
+
+    if (licensesToActivate.length > 0) {
+      await this.prisma.driving_License.updateMany({
+        where: {
+          license_Id: { in: licensesToActivate.map((l) => l.license_Id) },
+        },
+        data: { status: 'ACTIVE' },
+      });
+    }
   }
 
   private async processOverdueFines() {
@@ -107,24 +126,34 @@ export class FinesService {
     );
     const newPoints = oldPoints + totalPointsAdded;
 
-    let newStatus: 'ACTIVE' | 'SUSPENDED' | 'REVOKED' = 'SUSPENDED';
+    let newStatus = license.status as 'ACTIVE' | 'SUSPENDED' | 'REVOKED';
+    if (newStatus !== 'REVOKED' && newStatus !== 'SUSPENDED') {
+      newStatus = 'ACTIVE';
+    }
+
     let suspendedUntil = license.suspended_Until;
     let fineStatus: 'PENDING' | 'COURT_CASE' = 'PENDING';
+    let isPointSuspension = false;
 
     const now = new Date();
 
-    if (isCourtCase) {
-      newStatus = 'SUSPENDED';
-      fineStatus = 'COURT_CASE';
-    } else if (newPoints >= 100) {
+    if (newPoints >= 100 && oldPoints < 100) {
       newStatus = 'REVOKED';
       suspendedUntil = null;
-    } else if (newPoints >= 50) {
+      isPointSuspension = true;
+    } else if (newPoints >= 50 && oldPoints < 50) {
       newStatus = 'SUSPENDED';
       suspendedUntil = new Date(now.setMonth(now.getMonth() + 6));
-    } else if (newPoints >= 24) {
+      isPointSuspension = true;
+    } else if (newPoints >= 24 && oldPoints < 24) {
       newStatus = 'SUSPENDED';
       suspendedUntil = new Date(now.setMonth(now.getMonth() + 1));
+      isPointSuspension = true;
+    } else if (isCourtCase) {
+      newStatus = 'SUSPENDED';
+      fineStatus = 'COURT_CASE';
+    } else if (oldPoints >= 100 || license.status === 'REVOKED') {
+      newStatus = 'REVOKED';
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -153,7 +182,7 @@ export class FinesService {
         },
       });
 
-      if (!isCourtCase && newStatus !== 'REVOKED') {
+      if (!isPointSuspension && !isCourtCase && newStatus !== 'REVOKED') {
         const existingTemp = await tx.temporary_License.findFirst({
           where: { license_Id: licenseId },
         });
@@ -226,13 +255,23 @@ export class FinesService {
           },
         });
 
-        if (pendingCount === 0 && fine.license.status !== 'REVOKED') {
+        const currentLicense = await tx.driving_License.findUnique({
+          where: { license_Id: fine.license_Id },
+        });
+
+        const isPointsSuspended = currentLicense?.suspended_Until != null;
+
+        if (
+          pendingCount === 0 &&
+          currentLicense?.status !== 'REVOKED' &&
+          !isPointsSuspended
+        ) {
           await tx.temporary_License.deleteMany({
             where: { license_Id: fine.license_Id },
           });
           await tx.driving_License.update({
             where: { license_Id: fine.license_Id },
-            data: { status: 'ACTIVE', suspended_Until: null },
+            data: { status: 'ACTIVE' },
           });
         }
       }
@@ -260,7 +299,6 @@ export class FinesService {
     }
 
     const licenseId = fines[0].license_Id;
-    const licenseStatus = fines[0].license.status;
 
     return this.prisma.$transaction(async (tx) => {
       const payments: { payment_Id: string }[] = [];
@@ -301,13 +339,23 @@ export class FinesService {
           },
         });
 
-        if (pendingCount === 0 && licenseStatus !== 'REVOKED') {
+        const currentLicense = await tx.driving_License.findUnique({
+          where: { license_Id: licenseId },
+        });
+
+        const isPointsSuspended = currentLicense?.suspended_Until != null;
+
+        if (
+          pendingCount === 0 &&
+          currentLicense?.status !== 'REVOKED' &&
+          !isPointsSuspended
+        ) {
           await tx.temporary_License.deleteMany({
             where: { license_Id: licenseId },
           });
           await tx.driving_License.update({
             where: { license_Id: licenseId },
-            data: { status: 'ACTIVE', suspended_Until: null },
+            data: { status: 'ACTIVE' },
           });
         }
       }
@@ -324,6 +372,7 @@ export class FinesService {
   async updateCourtCase(fineId: string, verdict: 'ACTIVE' | 'REVOKED') {
     const fine = await this.prisma.fine.findUnique({
       where: { fine_Id: fineId },
+      include: { license: true },
     });
     if (!fine) throw new NotFoundException();
 
@@ -337,7 +386,7 @@ export class FinesService {
         where: { license_Id: fine.license_Id },
         data: {
           status: verdict,
-          points: verdict === 'ACTIVE' ? 0 : undefined,
+          points: verdict === 'ACTIVE' ? 0 : fine.license.points,
           suspended_Until: null,
         },
       });
