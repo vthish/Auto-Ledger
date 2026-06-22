@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import '../services/api_service.dart';
 import '../utils/secure_storage.dart';
@@ -24,10 +25,23 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool _hasShownPointsWarning = false;
 
+  List<Map<String, dynamic>> _recentActivities = [];
+
   @override
   void initState() {
     super.initState();
     _fetchLicenseData();
+  }
+
+  void _addRecentActivity(String title, IconData icon) {
+    if (!mounted) return;
+    setState(() {
+      _recentActivities.insert(0, {
+        'title': title,
+        'date': _formatDate(DateTime.now().toIso8601String()),
+        'icon': icon,
+      });
+    });
   }
 
   Future<void> _fetchLicenseData() async {
@@ -47,6 +61,25 @@ class _HomeScreenState extends State<HomeScreen> {
             'issued_By': 'Officer Kamal (Badge: 4567)'
           }
         ];
+
+        final activitiesRaw = _licenseData?['recentActivities'] as List<dynamic>? ?? [];
+        if (activitiesRaw.isEmpty) {
+          _recentActivities = [
+            {'title': 'License Renewed', 'date': '2023-10-15', 'icon': Icons.refresh},
+            {'title': 'Points Updated', 'date': '2023-10-10', 'icon': Icons.update},
+            {'title': 'Temporary License Issued', 'date': '2023-10-05', 'icon': Icons.card_membership},
+          ];
+        } else {
+          _recentActivities = activitiesRaw.map((e) {
+            final map = e as Map<String, dynamic>;
+            final String titleStr = map['title'] ?? map['description'] ?? 'Activity Update';
+            return {
+              'title': titleStr,
+              'date': _formatDate(map['date'] ?? map['createdAt'] ?? map['timestamp']),
+              'icon': Icons.local_activity,
+            };
+          }).toList();
+        }
 
         _isLoading = false;
       });
@@ -99,56 +132,58 @@ class _HomeScreenState extends State<HomeScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withOpacity(0.7),
+      barrierColor: Colors.black.withAlpha(179),
       builder: (BuildContext context) {
-        return Dialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-          elevation: 10,
-          backgroundColor: Colors.transparent,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.rectangle,
-              borderRadius: BorderRadius.circular(25),
-              boxShadow: const [
-                BoxShadow(color: Colors.black26, blurRadius: 20, offset: Offset(0, 10)),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                CircleAvatar(
-                  backgroundColor: warningColor.withOpacity(0.2),
-                  radius: 40,
-                  child: Icon(warningIcon, size: 40, color: warningColor),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  warningTitle,
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: warningColor),
-                ),
-                const SizedBox(height: 15),
-                Text(
-                  warningMessage,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 16, color: Colors.black87, fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 25),
-                SizedBox(
-                  width: double.infinity,
-                  height: 50,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1A2980),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-                      elevation: 0,
-                    ),
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('I Understand', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(77),
+                borderRadius: BorderRadius.circular(25),
+                border: Border.all(color: Colors.white.withAlpha(128), width: 1.5),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    backgroundColor: warningColor.withAlpha(51),
+                    radius: 40,
+                    child: Icon(warningIcon, size: 40, color: warningColor),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 20),
+                  Text(
+                    warningTitle,
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: warningColor),
+                  ),
+                  const SizedBox(height: 15),
+                  Text(
+                    warningMessage,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 16, color: Colors.black87, fontWeight: FontWeight.w500),
+                  ),
+                  const SizedBox(height: 25),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1A2980),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                        elevation: 0,
+                      ),
+                      onPressed: () {
+                        HapticFeedback.lightImpact();
+                        Navigator.of(context).pop();
+                      },
+                      child: const Text('I Understand', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -157,19 +192,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showTemporaryLicenseSheet(Map<String, dynamic> tempLicense) {
+    _addRecentActivity('Viewed Temporary License', Icons.assignment_late_outlined);
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (BuildContext context) {
         return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
           child: Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.3),
+              color: Colors.white.withAlpha(64),
               borderRadius: const BorderRadius.only(topLeft: Radius.circular(35), topRight: Radius.circular(35)),
-              border: Border.all(color: Colors.white.withOpacity(0.5), width: 1.5),
+              border: Border.all(color: Colors.white.withAlpha(128), width: 1.5),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -179,7 +216,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Container(
                     width: 50,
                     height: 5,
-                    decoration: BoxDecoration(color: Colors.grey[600], borderRadius: BorderRadius.circular(10)),
+                    decoration: BoxDecoration(color: Colors.white.withAlpha(128), borderRadius: BorderRadius.circular(10)),
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -195,26 +232,43 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 const SizedBox(height: 24),
                 _buildTempInfoRow('Issued Date', _formatDate(tempLicense['issue_Date'])),
-                const Divider(height: 20, color: Colors.black26),
+                Divider(height: 20, color: Colors.black.withAlpha(26)),
                 _buildTempInfoRow('Valid Until', _formatDate(tempLicense['expiry_Date']), isHighlight: true),
-                const Divider(height: 20, color: Colors.black26),
+                Divider(height: 20, color: Colors.black.withAlpha(26)),
                 _buildTempInfoRow('Issued By (Officer)', tempLicense['issued_By'] ?? 'Unknown'),
                 const SizedBox(height: 30),
-                SizedBox(
-                  width: double.infinity,
-                  height: 55,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white.withOpacity(0.5),
-                      foregroundColor: Colors.black87,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(15),
-                        side: BorderSide(color: Colors.white.withOpacity(0.6), width: 1.2),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(15),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                    child: SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        style: ButtonStyle(
+                          backgroundColor: WidgetStateProperty.resolveWith<Color>((states) {
+                            if (states.contains(WidgetState.pressed)) {
+                              return Colors.grey.shade400.withAlpha(153);
+                            }
+                            return Colors.white.withAlpha(51);
+                          }),
+                          foregroundColor: WidgetStateProperty.all(Colors.black87),
+                          elevation: WidgetStateProperty.all(0),
+                          shape: WidgetStateProperty.all(
+                            RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(15),
+                              side: BorderSide(color: Colors.white.withAlpha(102), width: 1.5),
+                            ),
+                          ),
+                          overlayColor: WidgetStateProperty.all(Colors.black12),
+                        ),
+                        onPressed: () {
+                          HapticFeedback.mediumImpact();
+                          Navigator.pop(context);
+                        },
+                        child: const Text('Close', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
-                      elevation: 0,
                     ),
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Close', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -236,7 +290,7 @@ class _HomeScreenState extends State<HomeScreen> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: isHighlight ? Colors.redAccent.shade700 : Colors.black87,
+            color: isHighlight ? Colors.red.shade900 : Colors.black87,
           ),
         ),
       ],
@@ -255,6 +309,8 @@ class _HomeScreenState extends State<HomeScreen> {
       final String token = response.data['qrToken'];
 
       if (mounted) Navigator.pop(context);
+
+      _addRecentActivity('Generated QR Code', Icons.qr_code_scanner);
 
       if (mounted) {
         showDialog(
@@ -325,16 +381,18 @@ class _HomeScreenState extends State<HomeScreen> {
     final String status = _licenseData?['status'] ?? 'UNKNOWN';
     final String? imageUrl = _licenseData?['image'];
 
+    final screenWidth = MediaQuery.of(context).size.width;
+
     return Container(
       key: const ValueKey(true),
       width: double.infinity,
-      height: 230,
+      height: screenWidth * 0.58,
       decoration: BoxDecoration(
         color: const Color(0xFFEAF5E1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+        border: Border.all(color: Colors.grey.withAlpha(77)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 5)),
+          BoxShadow(color: Colors.black.withAlpha(51), blurRadius: 10, offset: const Offset(0, 5)),
         ],
       ),
       child: Stack(
@@ -345,7 +403,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 opacity: 0.08,
                 child: Image.asset(
                   'assets/emblem.png',
-                  width: 130,
+                  width: screenWidth * 0.35,
                   color: Colors.black,
                   colorBlendMode: BlendMode.srcIn,
                   errorBuilder: (c, e, s) => const SizedBox(),
@@ -360,10 +418,10 @@ class _HomeScreenState extends State<HomeScreen> {
               opacity: 0.15,
               child: Image.asset(
                 'assets/punkalasa.png',
-                width: 60,
+                width: screenWidth * 0.15,
                 color: Colors.black,
                 colorBlendMode: BlendMode.srcIn,
-                errorBuilder: (c, e, s) => const Icon(Icons.security, size: 50, color: Colors.black),
+                errorBuilder: (c, e, s) => Icon(Icons.security, size: screenWidth * 0.13, color: Colors.black),
               ),
             ),
           ),
@@ -378,10 +436,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       decoration: BoxDecoration(border: Border.all(color: Colors.grey, width: 0.5)),
                       child: Image.asset(
                         'assets/flag.png',
-                        width: 35,
-                        height: 22,
+                        width: screenWidth * 0.09,
+                        height: screenWidth * 0.055,
                         fit: BoxFit.cover,
-                        errorBuilder: (c, e, s) => Container(width: 35, height: 22, color: Colors.grey[300]),
+                        errorBuilder: (c, e, s) => Container(width: screenWidth * 0.09, height: screenWidth * 0.055, color: Colors.grey[300]),
                       ),
                     ),
                     const SizedBox(width: 8),
@@ -395,7 +453,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             margin: const EdgeInsets.symmetric(vertical: 2),
                             height: 1.0,
                             width: double.infinity,
-                            color: Colors.grey.withOpacity(0.4),
+                            color: Colors.grey.withAlpha(102),
                           ),
                           const Text('DEMOCRATIC SOCIALIST REPUBLIC OF SRI LANKA', textAlign: TextAlign.center, style: TextStyle(fontSize: 8.5, fontWeight: FontWeight.w900, color: Color(0xFF0D47A1))),
                         ],
@@ -404,9 +462,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(width: 8),
                     Image.asset(
                       'assets/emblem.png',
-                      width: 30,
-                      height: 40,
-                      errorBuilder: (c, e, s) => const SizedBox(width: 30, height: 40),
+                      width: screenWidth * 0.08,
+                      height: screenWidth * 0.1,
+                      errorBuilder: (c, e, s) => SizedBox(width: screenWidth * 0.08, height: screenWidth * 0.1),
                     ),
                   ],
                 ),
@@ -420,8 +478,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Column(
                           children: [
                             Container(
-                              width: 70,
-                              height: 85,
+                              width: screenWidth * 0.18,
+                              height: screenWidth * 0.22,
                               decoration: const BoxDecoration(
                                 color: Colors.transparent,
                               ),
@@ -429,9 +487,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                   ? Image.network(
                                 imageUrl,
                                 fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, size: 55, color: Colors.black54),
+                                errorBuilder: (context, error, stackTrace) => Icon(Icons.person, size: screenWidth * 0.14, color: Colors.black54),
                               )
-                                  : const Icon(Icons.person, size: 55, color: Colors.black54),
+                                  : Icon(Icons.person, size: screenWidth * 0.14, color: Colors.black54),
                             ),
                             const SizedBox(height: 4),
                             Text('4a. $issueDate', style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.black87)),
@@ -464,21 +522,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
                                         gradient: LinearGradient(
-                                          colors: statusGradient.map((c) => c.withOpacity(0.8)).toList(),
+                                          colors: statusGradient.map((c) => c.withAlpha(204)).toList(),
                                           begin: Alignment.topLeft,
                                           end: Alignment.bottomRight,
                                         ),
                                         borderRadius: BorderRadius.circular(20),
                                         boxShadow: [
                                           BoxShadow(
-                                            color: glowColor.withOpacity(0.4),
+                                            color: glowColor.withAlpha(102),
                                             blurRadius: 4,
                                             spreadRadius: 1,
                                             offset: const Offset(0, 1),
                                           ),
                                         ],
                                         border: Border.all(
-                                          color: Colors.white.withOpacity(0.6),
+                                          color: Colors.white.withAlpha(153),
                                           width: 1.0,
                                         ),
                                       ),
@@ -586,7 +644,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   TableRow _buildTableRow(String col1, String col2, String col3, String restriction, {bool isHeader = false}) {
     return TableRow(
-      decoration: BoxDecoration(color: isHeader ? Colors.grey.withOpacity(0.2) : Colors.transparent),
+      decoration: BoxDecoration(color: isHeader ? Colors.grey.withAlpha(51) : Colors.transparent),
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 1.0, horizontal: 1.0),
@@ -609,16 +667,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildBackCard() {
+    final screenWidth = MediaQuery.of(context).size.width;
+
     return Container(
       key: const ValueKey(false),
       width: double.infinity,
-      height: 230,
+      height: screenWidth * 0.58,
       decoration: BoxDecoration(
         color: const Color(0xFFEAF5E1),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.grey.withOpacity(0.3)),
+        border: Border.all(color: Colors.grey.withAlpha(77)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 5)),
+          BoxShadow(color: Colors.black.withAlpha(51), blurRadius: 10, offset: const Offset(0, 5)),
         ],
       ),
       child: Stack(
@@ -629,7 +689,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 opacity: 0.04,
                 child: Image.asset(
                   'assets/emblem.png',
-                  width: 130,
+                  width: screenWidth * 0.35,
                   color: Colors.black,
                   colorBlendMode: BlendMode.srcIn,
                   errorBuilder: (c, e, s) => const SizedBox(),
@@ -684,7 +744,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: Align(
                     alignment: Alignment.centerLeft,
                     child: Table(
-                      border: TableBorder.all(color: Colors.black.withOpacity(0.3), width: 0.5),
+                      border: TableBorder.all(color: Colors.black.withAlpha(77), width: 0.5),
                       columnWidths: const {
                         0: FlexColumnWidth(1.2),
                         1: FlexColumnWidth(2.2),
@@ -735,12 +795,12 @@ class _HomeScreenState extends State<HomeScreen> {
             width: double.infinity,
             height: 60,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.75),
+              color: color.withAlpha(191),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.4), width: 1.5),
+              border: Border.all(color: Colors.white.withAlpha(102), width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withAlpha(13),
                   blurRadius: 10,
                   offset: const Offset(0, 5),
                 ),
@@ -754,6 +814,78 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentActivitiesFragment() {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(20),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.42,
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+              color: Colors.white.withAlpha(150), // Color opacity wadi kara (115 idan 150 ta)
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withAlpha(153), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withAlpha(26),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                )
+              ]
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Recent Activities',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1A2980)),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                height: 1.5,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF1A2980).withAlpha(100),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Expanded(
+                child: ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                  padding: EdgeInsets.zero,
+                  itemCount: _recentActivities.length,
+                  separatorBuilder: (context, index) => Divider(color: Colors.black.withAlpha(26)),
+                  itemBuilder: (context, index) {
+                    final activity = _recentActivities[index];
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A2980).withAlpha(38),
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(activity['icon'], color: const Color(0xFF1A2980), size: 20),
+                      ),
+                      title: Text(activity['title'], style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold, fontSize: 14)),
+                      subtitle: Text(activity['date'], style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                    );
+                  },
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -796,7 +928,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool hasTempLicense = tempLicenses.isNotEmpty;
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0, bottom: 90.0),
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0, bottom: 120.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -808,12 +941,13 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 8),
           GestureDetector(
             onTap: () {
+              HapticFeedback.selectionClick();
               setState(() {
                 _isFront = !_isFront;
               });
             },
             child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 400),
+              duration: const Duration(milliseconds: 150),
               transitionBuilder: (Widget child, Animation<double> animation) {
                 return FadeTransition(opacity: animation, child: child);
               },
@@ -827,7 +961,10 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'VIEW TEMPORARY LICENSE',
               icon: Icons.assignment_late_outlined,
               color: Colors.orangeAccent.shade700,
-              onPressed: () => _showTemporaryLicenseSheet(tempLicenses.last as Map<String, dynamic>),
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                _showTemporaryLicenseSheet(tempLicenses.last as Map<String, dynamic>);
+              },
             ),
             const SizedBox(height: 16),
           ],
@@ -836,8 +973,13 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'SHOW QR TO OFFICER',
             icon: Icons.qr_code_scanner,
             color: const Color(0xFF1A2980),
-            onPressed: _generateQR,
+            onPressed: () {
+              HapticFeedback.lightImpact();
+              _generateQR();
+            },
           ),
+          const SizedBox(height: 25),
+          _buildRecentActivitiesFragment(),
         ],
       ),
     );
@@ -846,13 +988,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildNavItem(int index, String title, IconData icon) {
     bool isSelected = _currentIndex == index;
     return GestureDetector(
-      onTap: () => setState(() => _currentIndex = index),
+      onTap: () {
+        HapticFeedback.selectionClick();
+        setState(() => _currentIndex = index);
+      },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 150),
         curve: Curves.easeInOut,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white.withOpacity(0.2) : Colors.transparent,
+          color: isSelected ? Colors.white.withAlpha(51) : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
@@ -885,7 +1030,7 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 250,
             height: 250,
             decoration: BoxDecoration(
-              color: const Color(0xFF1A2980).withOpacity(0.2),
+              color: const Color(0xFF1A2980).withAlpha(51),
               shape: BoxShape.circle,
             ),
           ),
@@ -897,7 +1042,7 @@ class _HomeScreenState extends State<HomeScreen> {
             width: 250,
             height: 250,
             decoration: BoxDecoration(
-              color: Colors.greenAccent.withOpacity(0.2),
+              color: Colors.greenAccent.withAlpha(51),
               shape: BoxShape.circle,
             ),
           ),
@@ -922,7 +1067,7 @@ class _HomeScreenState extends State<HomeScreen> {
           extendBody: true,
           extendBodyBehindAppBar: true,
           appBar: AppBar(
-            backgroundColor: const Color(0xFF1A2980).withOpacity(0.85),
+            backgroundColor: const Color(0xFF1A2980).withAlpha(217),
             flexibleSpace: ClipRect(
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -951,7 +1096,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(35),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
+                      color: Colors.black.withAlpha(38),
                       blurRadius: 20,
                       offset: const Offset(0, 10),
                     )
@@ -962,7 +1107,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: BackdropFilter(
                   filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
                   child: Container(
-                    color: const Color(0xFF1A2980).withOpacity(0.85),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1A2980).withAlpha(217),
+                      borderRadius: BorderRadius.circular(35),
+                      border: Border.all(color: Colors.white.withAlpha(77), width: 1.5),
+                    ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
@@ -1029,11 +1178,11 @@ class _QRDialogState extends State<_QRDialog> {
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.25),
+            color: Colors.white.withAlpha(64),
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: Colors.white.withOpacity(0.5), width: 1.5),
+            border: Border.all(color: Colors.white.withAlpha(128), width: 1.5),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 25, offset: const Offset(0, 10))
+              BoxShadow(color: Colors.black.withAlpha(26), blurRadius: 25, offset: const Offset(0, 10))
             ],
           ),
           child: Column(
@@ -1044,9 +1193,9 @@ class _QRDialogState extends State<_QRDialog> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.6),
+                    color: Colors.white.withAlpha(102),
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withOpacity(0.8), width: 2)
+                    border: Border.all(color: Colors.white.withAlpha(153), width: 2)
                 ),
                 child: QrImageView(
                   data: widget.qrToken,
@@ -1056,23 +1205,41 @@ class _QRDialogState extends State<_QRDialog> {
                 ),
               ),
               const SizedBox(height: 20),
-              Text(_formattedTime, style: const TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.redAccent)),
+              Text(_formattedTime, style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: Colors.red.shade900)),
               const SizedBox(height: 15),
-              SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withOpacity(0.5),
-                    foregroundColor: Colors.black87,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(15),
-                      side: BorderSide(color: Colors.white.withOpacity(0.6), width: 1.2),
+
+              ClipRRect(
+                borderRadius: BorderRadius.circular(15),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      style: ButtonStyle(
+                        backgroundColor: WidgetStateProperty.resolveWith<Color>((states) {
+                          if (states.contains(WidgetState.pressed)) {
+                            return Colors.grey.shade400.withAlpha(153);
+                          }
+                          return Colors.white.withAlpha(51);
+                        }),
+                        foregroundColor: WidgetStateProperty.all(Colors.black87),
+                        elevation: WidgetStateProperty.all(0),
+                        shape: WidgetStateProperty.all(
+                          RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                            side: BorderSide(color: Colors.white.withAlpha(102), width: 1.5),
+                          ),
+                        ),
+                        overlayColor: WidgetStateProperty.all(Colors.black12),
+                      ),
+                      onPressed: () {
+                        HapticFeedback.mediumImpact();
+                        Navigator.pop(context);
+                      },
+                      child: const Text('Close', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     ),
                   ),
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Close', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               )
             ],
