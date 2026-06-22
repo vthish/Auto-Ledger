@@ -51,42 +51,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
       setState(() {
         _licenseData = Map<String, dynamic>.from(response.data);
-
-        _licenseData!['points'] = 65;
-        _licenseData!['status'] = 'SUSPENDED';
-        _licenseData!['temporaryLicenses'] = [
-          {
-            'issue_Date': DateTime.now().toIso8601String(),
-            'expiry_Date': DateTime.now().add(const Duration(days: 14)).toIso8601String(),
-            'issued_By': 'Officer Kamal (Badge: 4567)'
-          }
-        ];
-
-        final activitiesRaw = _licenseData?['recentActivities'] as List<dynamic>? ?? [];
-        if (activitiesRaw.isEmpty) {
-          _recentActivities = [
-            {'title': 'License Renewed', 'date': '2023-10-15', 'icon': Icons.refresh},
-            {'title': 'Points Updated', 'date': '2023-10-10', 'icon': Icons.update},
-            {'title': 'Temporary License Issued', 'date': '2023-10-05', 'icon': Icons.card_membership},
-          ];
-        } else {
-          _recentActivities = activitiesRaw.map((e) {
-            final map = e as Map<String, dynamic>;
-            final String titleStr = map['title'] ?? map['description'] ?? 'Activity Update';
-            return {
-              'title': titleStr,
-              'date': _formatDate(map['date'] ?? map['createdAt'] ?? map['timestamp']),
-              'icon': Icons.local_activity,
-            };
-          }).toList();
-        }
-
         _isLoading = false;
       });
 
       if (!_hasShownPointsWarning) {
         final points = _licenseData?['points'] ?? 0;
-        if (points >= 24) {
+
+        // පෙන්විය යුත්තේ අවදානම් කලාප වලදී පමණි
+        final bool isApproachingSuspension = (points >= 20 && points <= 23) ||
+            (points >= 45 && points <= 49) ||
+            (points >= 80 && points <= 99);
+
+        if (isApproachingSuspension) {
           _hasShownPointsWarning = true;
           Future.microtask(() => _showPointsWarning(points));
         }
@@ -112,21 +88,21 @@ class _HomeScreenState extends State<HomeScreen> {
     String warningTitle;
     String warningMessage;
 
-    if (points >= 100) {
-      warningColor = Colors.redAccent;
-      warningIcon = Icons.cancel;
-      warningTitle = 'CRITICAL WARNING';
-      warningMessage = 'Your driving license has been revoked. You have accumulated $points demerit points.';
-    } else if (points >= 50) {
-      warningColor = Colors.orangeAccent;
+    if (points >= 80 && points <= 99) {
+      warningColor = Colors.red.shade400;
       warningIcon = Icons.warning_rounded;
-      warningTitle = 'SEVERE WARNING';
-      warningMessage = 'Your driving license is suspended for 6 months. You have $points demerit points.';
+      warningTitle = 'CRITICAL RISK';
+      warningMessage = 'You have high demerit points ($points points). Reach 100 points and your license will be permanently revoked.';
+    } else if (points >= 45 && points <= 49) {
+      warningColor = Colors.orange.shade400;
+      warningIcon = Icons.warning_rounded;
+      warningTitle = 'SEVERE RISK';
+      warningMessage = 'You have high demerit points ($points points). Reach 50 points and your license will be suspended.';
     } else {
-      warningColor = Colors.amber;
+      warningColor = Colors.amber.shade400;
       warningIcon = Icons.info_outline_rounded;
       warningTitle = 'WARNING';
-      warningMessage = 'You have high demerit points ($points points). Reach 50 points and your license will be suspended.';
+      warningMessage = 'You have high demerit points ($points points). Reach 24 points and your license will be suspended.';
     }
 
     showDialog(
