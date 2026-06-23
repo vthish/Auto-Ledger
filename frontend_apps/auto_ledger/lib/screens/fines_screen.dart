@@ -113,107 +113,165 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
         .fold(0, (sum, fine) => sum + fine['amount']);
   }
 
-  void _showPaymentDialog(List<Map<String, dynamic>> finesToPay) {
+  void _showPaymentBottomSheet(List<Map<String, dynamic>> finesToPay) {
     final double totalAmount = finesToPay.fold(0, (sum, item) => sum + item['amount']);
     final bool isBulk = finesToPay.length > 1;
 
     widget.onLogActivity('Initiated ${isBulk ? 'Bulk ' : ''}Payment', Icons.payment);
 
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      barrierColor: Colors.black.withAlpha(150),
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
       builder: (BuildContext context) {
         return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-          child: Dialog(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(40),
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: Colors.white.withAlpha(100), width: 1.5),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 25, offset: const Offset(0, 10)),
-                ],
-              ),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.payment_rounded, size: 40, color: Colors.blue.shade900),
-                    const SizedBox(height: 12),
-                    Text(
-                      isBulk ? 'Bulk Payment' : 'Pay Fine',
-                      style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue.shade900),
+          filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
+          child: Container(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+              left: 20,
+              right: 20,
+              top: 12,
+            ),
+            decoration: BoxDecoration(
+              color: Colors.white.withAlpha(20),
+              borderRadius: const BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)),
+              border: Border.all(color: Colors.white.withAlpha(60), width: 1.5),
+              boxShadow: [BoxShadow(color: Colors.black.withAlpha(15), blurRadius: 40, offset: const Offset(0, -10))],
+            ),
+            child: SingleChildScrollView(
+              physics: const BouncingScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: Colors.white.withAlpha(100), borderRadius: BorderRadius.circular(10)),
+                  ),
+                  const SizedBox(height: 16),
+
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withAlpha(40),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withAlpha(80), width: 1.0),
+                      boxShadow: [BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 20, offset: const Offset(0, 5))],
                     ),
-                    const SizedBox(height: 20),
-
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(90),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withAlpha(180), width: 1.5),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 10, offset: const Offset(0, 5)),
-                        ],
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                isBulk ? '${finesToPay.length} Fines Selected' : 'Fine ID: ${_formatId(finesToPay.first['id'])}',
-                                style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w700, fontSize: 13),
-                              ),
-                              Text(
-                                'Rs. ${totalAmount.toStringAsFixed(2)}',
-                                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.red.shade800),
-                              ),
-                            ],
-                          ),
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            child: Divider(color: Colors.black12, height: 1, thickness: 1),
-                          ),
-                          _buildDialogTextField('Card Number', Icons.credit_card, true),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Expanded(child: _buildDialogTextField('MM/YY', null, false)),
-                              const SizedBox(width: 12),
-                              Expanded(child: _buildDialogTextField('CVV', null, true, isObscure: true)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 30),
-
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(15),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: 55,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.white.withAlpha(120),
-                              foregroundColor: Colors.blue.shade900,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(15),
-                                side: BorderSide(color: Colors.white.withAlpha(200), width: 1.5),
-                              ),
-                              elevation: 0,
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isBulk ? 'Bulk Payment' : 'Pay Fine',
+                                  style: TextStyle(color: Colors.blue.shade900, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  isBulk ? '${finesToPay.length} Fines Selected' : 'ID: ${_formatId(finesToPay.first['id'])}',
+                                  style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 11),
+                                ),
+                              ],
                             ),
-                            onPressed: () {
+                            Text(
+                              'Rs. ${totalAmount.toStringAsFixed(2)}',
+                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.red.shade900),
+                            ),
+                          ],
+                        ),
+
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Row(
+                            children: List.generate(
+                                30,
+                                    (index) => Expanded(child: Container(height: 1.2, color: index % 2 == 0 ? Colors.white.withAlpha(150) : Colors.transparent))
+                            ),
+                          ),
+                        ),
+
+                        _buildPaymentTextField(
+                          'Card Number',
+                          Icons.credit_card_rounded,
+                          true,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                            LengthLimitingTextInputFormatter(16),
+                            _CardNumberFormatter(),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                                child: _buildPaymentTextField(
+                                  'MM/YY',
+                                  Icons.calendar_today_rounded,
+                                  false,
+                                  inputFormatters: [LengthLimitingTextInputFormatter(5)],
+                                )
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                                child: _buildPaymentTextField(
+                                  'CVV',
+                                  Icons.lock_outline_rounded,
+                                  true,
+                                  isObscure: true,
+                                  inputFormatters: [
+                                    FilteringTextInputFormatter.digitsOnly,
+                                    LengthLimitingTextInputFormatter(4),
+                                  ],
+                                )
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 1,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () => Navigator.pop(context),
+                            child: Container(
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withAlpha(20),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.white.withAlpha(80), width: 1.2),
+                              ),
+                              alignment: Alignment.center,
+                              child: const Text(
+                                'Cancel',
+                                style: TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () {
                               FocusManager.instance.primaryFocus?.unfocus();
                               HapticFeedback.heavyImpact();
                               widget.onLogActivity('Successfully Paid Rs. ${totalAmount.toStringAsFixed(2)}', Icons.check_circle);
@@ -231,18 +289,35 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                                 ),
                               );
                             },
-                            child: const Text('CONFIRM PAYMENT', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, letterSpacing: 1.2)),
+                            child: Container(
+                              height: 48,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withAlpha(50),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: Colors.white.withAlpha(120), width: 1.2),
+                                boxShadow: [
+                                  BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 10, offset: const Offset(0, 4)),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.verified_user_rounded, color: Colors.blue.shade900, size: 18),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'CONFIRM',
+                                    style: TextStyle(color: Colors.blue.shade900, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.0),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel', style: TextStyle(color: Colors.black54, fontWeight: FontWeight.bold)),
-                    )
-                  ],
-                ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                ],
               ),
             ),
           ),
@@ -251,23 +326,26 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildDialogTextField(String label, IconData? icon, bool isNumber, {bool isObscure = false}) {
+  Widget _buildPaymentTextField(String label, IconData icon, bool isNumber, {bool isObscure = false, List<TextInputFormatter>? inputFormatters}) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(120),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withAlpha(180), width: 1),
+        color: Colors.white.withAlpha(70),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withAlpha(150), width: 1.0),
       ),
       child: TextField(
         keyboardType: isNumber ? TextInputType.number : TextInputType.text,
         obscureText: isObscure,
-        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
+        inputFormatters: inputFormatters,
+        style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.black87, fontSize: 14),
         decoration: InputDecoration(
+          isDense: true,
           labelText: label,
-          labelStyle: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w600, fontSize: 13),
-          prefixIcon: icon != null ? Icon(icon, color: Colors.blue.shade900, size: 20) : null,
+          labelStyle: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700, fontSize: 12),
+          prefixIcon: Icon(icon, color: Colors.blue.shade800, size: 18),
+          prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 40),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         ),
       ),
     );
@@ -386,7 +464,7 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                           ),
                           onPressed: () {
                             HapticFeedback.lightImpact();
-                            _showPaymentDialog([fine]);
+                            _showPaymentBottomSheet([fine]);
                           },
                           child: const Text('PAY NOW', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
                         ),
@@ -463,7 +541,7 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                         elevation: 0,
                         minimumSize: const Size(0, 36),
                       ),
-                      onPressed: () => _showPaymentDialog(finesToPay),
+                      onPressed: () => _showPaymentBottomSheet(finesToPay),
                       child: const Text('PAY SELECTED', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.5)),
                     ),
                   ],
@@ -524,6 +602,25 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
           ),
         ),
       ],
+    );
+  }
+}
+
+class _CardNumberFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    final text = newValue.text.replaceAll(RegExp(r'\s+'), '');
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      buffer.write(text[i]);
+      if ((i + 1) % 4 == 0 && i != text.length - 1) {
+        buffer.write(' ');
+      }
+    }
+    final string = buffer.toString();
+    return TextEditingValue(
+      text: string,
+      selection: TextSelection.collapsed(offset: string.length),
     );
   }
 }
