@@ -103,7 +103,7 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
       if (!_selectedFines.remove(id)) _selectedFines.add(id);
     });
     if (wasEmpty != _selectedFines.isEmpty) {
-      widget.onSelectionModeChanged(!_selectedFines.isEmpty);
+      widget.onSelectionModeChanged(_selectedFines.isNotEmpty);
     }
   }
 
@@ -125,208 +125,282 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
       backgroundColor: Colors.transparent,
       elevation: 0,
       builder: (BuildContext context) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-          child: Container(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-              left: 20,
-              right: 20,
-              top: 12,
-            ),
-            decoration: BoxDecoration(
-              color: Colors.white.withAlpha(20),
-              borderRadius: const BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)),
-              border: Border.all(color: Colors.white.withAlpha(60), width: 1.5),
-              boxShadow: [BoxShadow(color: Colors.black.withAlpha(15), blurRadius: 40, offset: const Offset(0, -10))],
-            ),
-            child: SingleChildScrollView(
-              physics: const BouncingScrollPhysics(),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(color: Colors.white.withAlpha(100), borderRadius: BorderRadius.circular(10)),
-                  ),
-                  const SizedBox(height: 16),
+        bool isCvvObscured = true;
 
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withAlpha(40),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withAlpha(80), width: 1.0),
-                      boxShadow: [BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 20, offset: const Offset(0, 5))],
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
+              child: Container(
+                padding: EdgeInsets.only(
+                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                  left: 20,
+                  right: 20,
+                  top: 12,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(20),
+                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)),
+                  border: Border.all(color: Colors.white.withAlpha(60), width: 1.5),
+                  boxShadow: [BoxShadow(color: Colors.black.withAlpha(15), blurRadius: 40, offset: const Offset(0, -10))],
+                ),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(color: Colors.white.withAlpha(100), borderRadius: BorderRadius.circular(10)),
+                      ),
+                      const SizedBox(height: 16),
+
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withAlpha(40),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: Colors.white.withAlpha(80), width: 1.0),
+                          boxShadow: [BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 20, offset: const Offset(0, 5))],
+                        ),
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text(
-                                  isBulk ? 'Bulk Payment' : 'Pay Fine',
-                                  style: TextStyle(color: Colors.blue.shade900, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      isBulk ? 'Bulk Payment' : 'Pay Fine',
+                                      style: TextStyle(color: Colors.blue.shade900, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      isBulk ? '${finesToPay.length} Fines Selected' : 'ID: ${_formatId(finesToPay.first['id'])}',
+                                      style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 11),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: 2),
                                 Text(
-                                  isBulk ? '${finesToPay.length} Fines Selected' : 'ID: ${_formatId(finesToPay.first['id'])}',
-                                  style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 11),
+                                  'Rs. ${totalAmount.toStringAsFixed(2)}',
+                                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.red.shade900),
                                 ),
                               ],
                             ),
-                            Text(
-                              'Rs. ${totalAmount.toStringAsFixed(2)}',
-                              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.red.shade900),
-                            ),
-                          ],
-                        ),
 
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          child: Row(
-                            children: List.generate(
-                                30,
-                                    (index) => Expanded(child: Container(height: 1.2, color: index % 2 == 0 ? Colors.white.withAlpha(150) : Colors.transparent))
-                            ),
-                          ),
-                        ),
-
-                        _buildPaymentTextField(
-                          'Card Number',
-                          Icons.credit_card_rounded,
-                          true,
-                          inputFormatters: [
-                            FilteringTextInputFormatter.digitsOnly,
-                            LengthLimitingTextInputFormatter(16),
-                            _CardNumberFormatter(),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                                child: _buildPaymentTextField(
-                                  'MM/YY',
-                                  Icons.calendar_today_rounded,
-                                  false,
-                                  inputFormatters: [LengthLimitingTextInputFormatter(5)],
-                                )
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                                child: _buildPaymentTextField(
-                                  'CVV',
-                                  Icons.lock_outline_rounded,
-                                  true,
-                                  isObscure: true,
-                                  inputFormatters: [
-                                    FilteringTextInputFormatter.digitsOnly,
-                                    LengthLimitingTextInputFormatter(4),
-                                  ],
-                                )
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 1,
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () => Navigator.pop(context),
-                            child: Container(
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withAlpha(20),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.white.withAlpha(80), width: 1.2),
-                              ),
-                              alignment: Alignment.center,
-                              child: const Text(
-                                'Cancel',
-                                style: TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.5),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        flex: 2,
-                        child: Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(16),
-                            onTap: () {
-                              FocusManager.instance.primaryFocus?.unfocus();
-                              HapticFeedback.heavyImpact();
-                              widget.onLogActivity('Successfully Paid Rs. ${totalAmount.toStringAsFixed(2)}', Icons.check_circle);
-
-                              setState(() => _selectedFines.clear());
-                              widget.onSelectionModeChanged(false);
-
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  backgroundColor: Colors.green.shade800,
-                                  behavior: SnackBarBehavior.floating,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  content: const Text('Payment Successful!', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                ),
-                              );
-                            },
-                            child: Container(
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: Colors.white.withAlpha(50),
-                                borderRadius: BorderRadius.circular(16),
-                                border: Border.all(color: Colors.white.withAlpha(120), width: 1.2),
-                                boxShadow: [
-                                  BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 10, offset: const Offset(0, 4)),
-                                ],
-                              ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
                               child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.verified_user_rounded, color: Colors.blue.shade900, size: 18),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'CONFIRM',
-                                    style: TextStyle(color: Colors.blue.shade900, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.0),
+                                children: List.generate(
+                                    30,
+                                        (index) => Expanded(child: Container(height: 1.2, color: index % 2 == 0 ? Colors.white.withAlpha(150) : Colors.transparent))
+                                ),
+                              ),
+                            ),
+
+                            _buildPaymentTextField(
+                              'Card Number',
+                              Icons.credit_card_rounded,
+                              true,
+                              fontSize: 16,
+                              inputFormatters: [
+                                FilteringTextInputFormatter.digitsOnly,
+                                LengthLimitingTextInputFormatter(16),
+                                _CardNumberFormatter(),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                    child: _buildPaymentTextField(
+                                      'MM/YY',
+                                      Icons.calendar_today_rounded,
+                                      true,
+                                      inputFormatters: [
+                                        _ExpiryDateFormatter(),
+                                        LengthLimitingTextInputFormatter(5),
+                                      ],
+                                    )
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                    child: _buildPaymentTextField(
+                                      'CVV',
+                                      Icons.lock_outline_rounded,
+                                      true,
+                                      isObscure: isCvvObscured,
+                                      suffixIcon: IconButton(
+                                        icon: Icon(
+                                          isCvvObscured ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                                          color: Colors.blue.shade800,
+                                          size: 18,
+                                        ),
+                                        onPressed: () {
+                                          setModalState(() {
+                                            isCvvObscured = !isCvvObscured;
+                                          });
+                                        },
+                                      ),
+                                      inputFormatters: [
+                                        FilteringTextInputFormatter.digitsOnly,
+                                        LengthLimitingTextInputFormatter(4),
+                                      ],
+                                    )
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 20),
+
+                      Row(
+                        children: [
+                          Expanded(
+                            flex: 1,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () => Navigator.pop(context),
+                                child: Container(
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withAlpha(20),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.white.withAlpha(80), width: 1.2),
                                   ),
-                                ],
+                                  alignment: Alignment.center,
+                                  child: const Text(
+                                    'Cancel',
+                                    style: TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            flex: 2,
+                            child: Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(16),
+                                onTap: () {
+                                  FocusManager.instance.primaryFocus?.unfocus();
+                                  HapticFeedback.heavyImpact();
+                                  widget.onLogActivity('Successfully Paid Rs. ${totalAmount.toStringAsFixed(2)}', Icons.check_circle);
+
+                                  setState(() => _selectedFines.clear());
+                                  widget.onSelectionModeChanged(false);
+
+                                  Navigator.pop(context);
+
+                                  showDialog(
+                                    context: this.context,
+                                    barrierColor: Colors.black.withAlpha(80),
+                                    barrierDismissible: false,
+                                    builder: (BuildContext dialogContext) {
+                                      return BackdropFilter(
+                                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                                        child: Center(
+                                          child: Material(
+                                            color: Colors.transparent,
+                                            child: ClipRRect(
+                                              borderRadius: BorderRadius.circular(24),
+                                              child: BackdropFilter(
+                                                filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                                                child: Container(
+                                                  width: 220,
+                                                  padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.white.withAlpha(40),
+                                                    borderRadius: BorderRadius.circular(24),
+                                                    border: Border.all(color: Colors.white.withAlpha(80), width: 1.5),
+                                                    boxShadow: [
+                                                      BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 40, offset: const Offset(0, 10))
+                                                    ],
+                                                  ),
+                                                  child: Column(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      Container(
+                                                        padding: const EdgeInsets.all(16),
+                                                        decoration: BoxDecoration(
+                                                          color: Colors.greenAccent.withAlpha(40),
+                                                          shape: BoxShape.circle,
+                                                          border: Border.all(color: Colors.greenAccent.withAlpha(100), width: 2),
+                                                        ),
+                                                        child: const Icon(Icons.check_rounded, color: Colors.greenAccent, size: 40),
+                                                      ),
+                                                      const SizedBox(height: 20),
+                                                      const Text(
+                                                        'Payment Successful!',
+                                                        textAlign: TextAlign.center,
+                                                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  );
+
+                                  Future.delayed(const Duration(milliseconds: 2000), () {
+                                    if (mounted) {
+                                      Navigator.pop(this.context);
+                                    }
+                                  });
+                                },
+                                child: Container(
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withAlpha(50),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.white.withAlpha(120), width: 1.2),
+                                    boxShadow: [
+                                      BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 10, offset: const Offset(0, 4)),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.verified_user_rounded, color: Colors.blue.shade900, size: 18),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        'CONFIRM',
+                                        style: TextStyle(color: Colors.blue.shade900, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.0),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 10),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildPaymentTextField(String label, IconData icon, bool isNumber, {bool isObscure = false, List<TextInputFormatter>? inputFormatters}) {
+  Widget _buildPaymentTextField(String label, IconData icon, bool isNumber, {bool isObscure = false, List<TextInputFormatter>? inputFormatters, Widget? suffixIcon, double? fontSize}) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white.withAlpha(70),
@@ -337,13 +411,14 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
         keyboardType: isNumber ? TextInputType.number : TextInputType.text,
         obscureText: isObscure,
         inputFormatters: inputFormatters,
-        style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.black87, fontSize: 14),
+        style: TextStyle(fontWeight: FontWeight.w800, color: Colors.black87, fontSize: fontSize ?? 15),
         decoration: InputDecoration(
           isDense: true,
           labelText: label,
           labelStyle: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700, fontSize: 12),
           prefixIcon: Icon(icon, color: Colors.blue.shade800, size: 18),
           prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+          suffixIcon: suffixIcon,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         ),
@@ -614,9 +689,47 @@ class _CardNumberFormatter extends TextInputFormatter {
     for (int i = 0; i < text.length; i++) {
       buffer.write(text[i]);
       if ((i + 1) % 4 == 0 && i != text.length - 1) {
-        buffer.write(' ');
+        buffer.write('   ');
       }
     }
+    final string = buffer.toString();
+    return TextEditingValue(
+      text: string,
+      selection: TextSelection.collapsed(offset: string.length),
+    );
+  }
+}
+
+class _ExpiryDateFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.length < oldValue.text.length) {
+      return newValue;
+    }
+    String text = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (text.isEmpty) return newValue;
+
+    if (text.length == 1 && int.parse(text) > 1) {
+      text = '0$text';
+    }
+
+    if (text.length >= 2) {
+      int month = int.parse(text.substring(0, 2));
+      if (month < 1 || month > 12) {
+        return oldValue;
+      }
+    }
+
+    final buffer = StringBuffer();
+    for (int i = 0; i < text.length; i++) {
+      buffer.write(text[i]);
+      if (i == 1 && text.length > 2) {
+        buffer.write('/');
+      } else if (i == 1 && text.length == 2) {
+        buffer.write('/');
+      }
+    }
+
     final string = buffer.toString();
     return TextEditingValue(
       text: string,
