@@ -461,48 +461,50 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Widget _buildDynamicGlassBackground() {
-    return Stack(
-      children: [
-        Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+    return RepaintBoundary(
+      child: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
             ),
           ),
-        ),
-        Positioned(
-          top: 100,
-          left: -80,
-          child: Container(
-            width: 300,
-            height: 300,
-            decoration: BoxDecoration(
-              color: Colors.cyanAccent.withAlpha(40),
-              shape: BoxShape.circle,
+          Positioned(
+            top: 100,
+            left: -80,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                color: Colors.cyanAccent.withAlpha(40),
+                shape: BoxShape.circle,
+              ),
             ),
           ),
-        ),
-        Positioned(
-          bottom: -50,
-          right: -50,
-          child: Container(
-            width: 250,
-            height: 250,
-            decoration: BoxDecoration(
-              color: Colors.deepPurpleAccent.withAlpha(60),
-              shape: BoxShape.circle,
+          Positioned(
+            bottom: -50,
+            right: -50,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                color: Colors.deepPurpleAccent.withAlpha(60),
+                shape: BoxShape.circle,
+              ),
             ),
           ),
-        ),
-        Positioned.fill(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-            child: Container(color: Colors.transparent),
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+              child: const SizedBox(),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

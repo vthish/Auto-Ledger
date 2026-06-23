@@ -994,42 +994,44 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildGlassBackground() {
-    return Stack(
-      children: [
-        Container(
-          color: const Color(0xFFF0F4FF),
-        ),
-        Positioned(
-          top: -50,
-          left: -50,
-          child: Container(
-            width: 250,
-            height: 250,
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A2980).withAlpha(51),
-              shape: BoxShape.circle,
+    return RepaintBoundary(
+      child: Stack(
+        children: [
+          Container(
+            color: const Color(0xFFF0F4FF),
+          ),
+          Positioned(
+            top: -50,
+            left: -50,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                color: const Color(0xFF1A2980).withAlpha(51),
+                shape: BoxShape.circle,
+              ),
             ),
           ),
-        ),
-        Positioned(
-          bottom: 100,
-          right: -50,
-          child: Container(
-            width: 250,
-            height: 250,
-            decoration: BoxDecoration(
-              color: Colors.greenAccent.withAlpha(51),
-              shape: BoxShape.circle,
+          Positioned(
+            bottom: 100,
+            right: -50,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                color: Colors.greenAccent.withAlpha(51),
+                shape: BoxShape.circle,
+              ),
             ),
           ),
-        ),
-        Positioned.fill(
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
-            child: Container(color: Colors.transparent),
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+              child: Container(color: Colors.transparent),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
