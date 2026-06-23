@@ -1,6 +1,8 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:dio/dio.dart';
+import '../services/api_service.dart';
 
 class FinesScreen extends StatefulWidget {
   final void Function(String, IconData) onLogActivity;
@@ -20,50 +22,19 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
   late TabController _tabController;
   final Set<String> _selectedFines = {};
 
-  final List<Map<String, dynamic>> _hardcodedFines = const [
-    {
-      'id': 'a1b2c3d4-1234-5678-90ab-cdef12345678',
-      'date': '2026-06-20T10:30:00Z',
-      'amount': 3500.0,
-      'offenses': ['Speeding (Above 20kmph)', 'No Seatbelt'],
-      'status': 'PENDING',
-      'officer': 'A. Perera (TRF-102)',
-      'location': 'Galle Road, Colombo 03',
-      'dueDate': '2026-07-04T10:30:00Z',
-    },
-    {
-      'id': 'f8e7d6c5-4321-8765-ba09-87654321fedc',
-      'date': '2026-06-18T14:15:00Z',
-      'amount': 1000.0,
-      'offenses': ['Illegal Parking'],
-      'status': 'PENDING',
-      'officer': 'K. Silva (TRF-045)',
-      'location': 'Marine Drive',
-      'dueDate': '2026-07-02T14:15:00Z',
-    },
-    {
-      'id': '99aa88bb-77cc-66dd-55ee-44ff33ee22dd',
-      'date': '2026-05-10T09:00:00Z',
-      'amount': 2500.0,
-      'offenses': ['Disobeying Traffic Light'],
-      'status': 'PAID',
-      'officer': 'M. Fernando (TRF-088)',
-      'location': 'Bauddhaloka Mawatha',
-      'dueDate': '2026-05-24T09:00:00Z',
-    },
-  ];
+  List<Map<String, dynamic>> _pendingFines = [];
+  List<Map<String, dynamic>> _paidFines = [];
 
-  late final List<Map<String, dynamic>> _pendingFines;
-  late final List<Map<String, dynamic>> _paidFines;
+  bool _isLoading = true;
+  String _errorMessage = '';
 
   @override
   void initState() {
     super.initState();
-    _pendingFines = _hardcodedFines.where((f) => f['status'] == 'PENDING').toList();
-    _paidFines = _hardcodedFines.where((f) => f['status'] == 'PAID').toList();
-
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_handleTabChange);
+
+    _fetchFines(); // Fetch from backend on load
   }
 
   void _handleTabChange() {
@@ -74,6 +45,190 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
         setState(() => _selectedFines.clear());
         widget.onSelectionModeChanged(false);
       }
+    }
+  }
+
+  Future<void> _fetchFines() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
+    try {
+      final response = await ApiService.dio.get('/fines/my-fines');
+      final finesData = response.data as List<dynamic>;
+
+      final List<Map<String, dynamic>> parsedPending = [];
+      final List<Map<String, dynamic>> parsedPaid = [];
+
+      for (var f in finesData) {
+        double totalAmount = 0.0;
+        List<String> offenseNames = [];
+
+        // Extract offenses and calculate total amount
+        if (f['offenses'] != null) {
+          for (var o in f['offenses']) {
+            final category = o['offenceCategory'];
+            if (category != null) {
+              totalAmount += (category['amount'] ?? 0).toDouble();
+              offenseNames.add(category['name'].toString());
+            }
+          }
+        }
+
+        // Format officer name
+        final officer = f['trafficOfficer'];
+        final officerName = officer != null
+            ? '${officer['name']} (${officer['badge_No']})'
+            : 'Unknown Officer';
+
+        final mappedFine = {
+          'id': f['fine_Id'],
+          'date': f['issue_At'],
+          'amount': totalAmount,
+          'offenses': offenseNames.isNotEmpty ? offenseNames : ['Unknown Offense'],
+          'status': f['status'],
+          'officer': officerName,
+          'location': 'Not Specified', // Location is not stored in Fine model directly
+          'dueDate': f['due_Date'],
+        };
+
+        // PENDING, OVERDUE, COURT_CASE goes to Pending tab. PAID goes to Paid tab.
+        if (f['status'] == 'PAID') {
+          parsedPaid.add(mappedFine);
+        } else {
+          parsedPending.add(mappedFine);
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _pendingFines = parsedPending;
+          _paidFines = parsedPaid;
+          _isLoading = false;
+        });
+      }
+    } on DioException catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = e.response?.data['message'] ?? 'Failed to load fines.';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'An unexpected error occurred.';
+        });
+      }
+    }
+  }
+
+  Future<void> _processPayment(List<Map<String, dynamic>> finesToPay, double totalAmount) async {
+    // Hide keyboard
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) => const Center(child: CircularProgressIndicator(color: Colors.white)),
+    );
+
+    try {
+      if (finesToPay.length == 1) {
+        // Single payment
+        await ApiService.dio.post('/fines/${finesToPay.first['id']}/pay', data: {'amount': totalAmount});
+      } else {
+        // Bulk payment
+        final ids = finesToPay.map((f) => f['id'].toString()).toList();
+        await ApiService.dio.post('/fines/pay-bulk', data: {'fineIds': ids, 'totalAmount': totalAmount});
+      }
+
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog
+      Navigator.pop(context); // Close payment bottom sheet/dialog
+
+      HapticFeedback.heavyImpact();
+      widget.onLogActivity('Successfully Paid Rs. ${totalAmount.toStringAsFixed(2)}', Icons.check_circle);
+
+      setState(() => _selectedFines.clear());
+      widget.onSelectionModeChanged(false);
+
+      // Show Success Dialog
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withAlpha(80),
+        barrierDismissible: false,
+        builder: (BuildContext dialogContext) {
+          return BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Center(
+              child: Material(
+                color: Colors.transparent,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                    child: Container(
+                      width: 220,
+                      padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(40),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(color: Colors.white.withAlpha(80), width: 1.5),
+                        boxShadow: [
+                          BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 40, offset: const Offset(0, 10))
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.greenAccent.withAlpha(40),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.greenAccent.withAlpha(100), width: 2),
+                            ),
+                            child: const Icon(Icons.check_rounded, color: Colors.greenAccent, size: 40),
+                          ),
+                          const SizedBox(height: 20),
+                          const Text(
+                            'Payment Successful!',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+
+      // Close success dialog after 2 seconds and refresh fines
+      Future.delayed(const Duration(milliseconds: 2000), () {
+        if (mounted) {
+          Navigator.pop(context); // Close success dialog
+          _fetchFines(); // Refresh lists
+        }
+      });
+
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.red.shade800,
+          behavior: SnackBarBehavior.floating,
+          content: const Text('Payment Failed! Please try again.', style: TextStyle(color: Colors.white)),
+        ),
+      );
     }
   }
 
@@ -108,288 +263,218 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
   }
 
   double _calculateTotalSelectedAmount() {
-    return _hardcodedFines
+    return _pendingFines
         .where((fine) => _selectedFines.contains(fine['id']))
         .fold(0, (sum, fine) => sum + fine['amount']);
   }
 
-  void _showPaymentBottomSheet(List<Map<String, dynamic>> finesToPay) {
+  void _showPaymentDialog(List<Map<String, dynamic>> finesToPay) {
     final double totalAmount = finesToPay.fold(0, (sum, item) => sum + item['amount']);
     final bool isBulk = finesToPay.length > 1;
 
     widget.onLogActivity('Initiated ${isBulk ? 'Bulk ' : ''}Payment', Icons.payment);
 
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      elevation: 0,
+      barrierColor: Colors.black.withAlpha(150),
       builder: (BuildContext context) {
         bool isCvvObscured = true;
 
         return StatefulBuilder(
           builder: (context, setModalState) {
             return BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
-              child: Container(
-                padding: EdgeInsets.only(
-                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-                  left: 20,
-                  right: 20,
-                  top: 12,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(20),
-                  borderRadius: const BorderRadius.only(topLeft: Radius.circular(30), topRight: Radius.circular(30)),
-                  border: Border.all(color: Colors.white.withAlpha(60), width: 1.5),
-                  boxShadow: [BoxShadow(color: Colors.black.withAlpha(15), blurRadius: 40, offset: const Offset(0, -10))],
-                ),
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(color: Colors.white.withAlpha(100), borderRadius: BorderRadius.circular(10)),
-                      ),
-                      const SizedBox(height: 16),
-
-                      Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white.withAlpha(40),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white.withAlpha(80), width: 1.0),
-                          boxShadow: [BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 20, offset: const Offset(0, 5))],
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Dialog(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(40),
+                    borderRadius: BorderRadius.circular(30),
+                    border: Border.all(color: Colors.white.withAlpha(100), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 25, offset: const Offset(0, 10)),
+                    ],
+                  ),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.payment_rounded, size: 40, color: Colors.blue.shade900),
+                        const SizedBox(height: 12),
+                        Text(
+                          isBulk ? 'Bulk Payment' : 'Pay Fine',
+                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue.shade900),
                         ),
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      isBulk ? 'Bulk Payment' : 'Pay Fine',
-                                      style: TextStyle(color: Colors.blue.shade900, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      isBulk ? '${finesToPay.length} Fines Selected' : 'ID: ${_formatId(finesToPay.first['id'])}',
-                                      style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 11),
-                                    ),
-                                  ],
-                                ),
-                                Text(
-                                  'Rs. ${totalAmount.toStringAsFixed(2)}',
-                                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.red.shade900),
-                                ),
-                              ],
-                            ),
+                        const SizedBox(height: 20),
 
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
-                              child: Row(
-                                children: List.generate(
-                                    30,
-                                        (index) => Expanded(child: Container(height: 1.2, color: index % 2 == 0 ? Colors.white.withAlpha(150) : Colors.transparent))
+                        Container(
+                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withAlpha(60),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: Colors.white.withAlpha(120), width: 1),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        isBulk ? 'Bulk Payment' : 'Pay Fine',
+                                        style: TextStyle(color: Colors.blue.shade900, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        isBulk ? '${finesToPay.length} Fines Selected' : 'ID: ${_formatId(finesToPay.first['id'])}',
+                                        style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 11),
+                                      ),
+                                    ],
+                                  ),
+                                  Text(
+                                    'Rs. ${totalAmount.toStringAsFixed(2)}',
+                                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.red.shade900),
+                                  ),
+                                ],
+                              ),
+
+                              Padding(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                child: Row(
+                                  children: List.generate(
+                                      30,
+                                          (index) => Expanded(child: Container(height: 1.2, color: index % 2 == 0 ? Colors.white.withAlpha(150) : Colors.transparent))
+                                  ),
+                                ),
+                              ),
+
+                              _buildPaymentTextField(
+                                'Card Number',
+                                Icons.credit_card_rounded,
+                                true,
+                                fontSize: 16,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly,
+                                  LengthLimitingTextInputFormatter(16),
+                                  _CardNumberFormatter(),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                      child: _buildPaymentTextField(
+                                        'MM/YY',
+                                        Icons.calendar_today_rounded,
+                                        true,
+                                        inputFormatters: [
+                                          _ExpiryDateFormatter(),
+                                          LengthLimitingTextInputFormatter(5),
+                                        ],
+                                      )
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                      child: _buildPaymentTextField(
+                                        'CVV',
+                                        Icons.lock_outline_rounded,
+                                        true,
+                                        isObscure: isCvvObscured,
+                                        suffixIcon: IconButton(
+                                          icon: Icon(
+                                            isCvvObscured ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                                            color: Colors.blue.shade800,
+                                            size: 18,
+                                          ),
+                                          onPressed: () {
+                                            setModalState(() {
+                                              isCvvObscured = !isCvvObscured;
+                                            });
+                                          },
+                                        ),
+                                        inputFormatters: [
+                                          FilteringTextInputFormatter.digitsOnly,
+                                          LengthLimitingTextInputFormatter(4),
+                                        ],
+                                      )
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        Row(
+                          children: [
+                            Expanded(
+                              flex: 1,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(16),
+                                  onTap: () => Navigator.pop(context),
+                                  child: Container(
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withAlpha(20),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: Colors.white.withAlpha(80), width: 1.2),
+                                    ),
+                                    alignment: Alignment.center,
+                                    child: const Text(
+                                      'Cancel',
+                                      style: TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.5),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
-
-                            _buildPaymentTextField(
-                              'Card Number',
-                              Icons.credit_card_rounded,
-                              true,
-                              fontSize: 16,
-                              inputFormatters: [
-                                FilteringTextInputFormatter.digitsOnly,
-                                LengthLimitingTextInputFormatter(16),
-                                _CardNumberFormatter(),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Expanded(
-                                    child: _buildPaymentTextField(
-                                      'MM/YY',
-                                      Icons.calendar_today_rounded,
-                                      true,
-                                      inputFormatters: [
-                                        _ExpiryDateFormatter(),
-                                        LengthLimitingTextInputFormatter(5),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              flex: 2,
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(16),
+                                  onTap: () => _processPayment(finesToPay, totalAmount),
+                                  child: Container(
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withAlpha(50),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(color: Colors.white.withAlpha(120), width: 1.2),
+                                      boxShadow: [
+                                        BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 10, offset: const Offset(0, 4)),
                                       ],
-                                    )
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                    child: _buildPaymentTextField(
-                                      'CVV',
-                                      Icons.lock_outline_rounded,
-                                      true,
-                                      isObscure: isCvvObscured,
-                                      suffixIcon: IconButton(
-                                        icon: Icon(
-                                          isCvvObscured ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                                          color: Colors.blue.shade800,
-                                          size: 18,
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        Icon(Icons.verified_user_rounded, color: Colors.blue.shade900, size: 18),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          'CONFIRM',
+                                          style: TextStyle(color: Colors.blue.shade900, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.0),
                                         ),
-                                        onPressed: () {
-                                          setModalState(() {
-                                            isCvvObscured = !isCvvObscured;
-                                          });
-                                        },
-                                      ),
-                                      inputFormatters: [
-                                        FilteringTextInputFormatter.digitsOnly,
-                                        LengthLimitingTextInputFormatter(4),
                                       ],
-                                    )
+                                    ),
+                                  ),
                                 ),
-                              ],
+                              ),
                             ),
                           ],
                         ),
-                      ),
-
-                      const SizedBox(height: 20),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 1,
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(16),
-                                onTap: () => Navigator.pop(context),
-                                child: Container(
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withAlpha(20),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: Colors.white.withAlpha(80), width: 1.2),
-                                  ),
-                                  alignment: Alignment.center,
-                                  child: const Text(
-                                    'Cancel',
-                                    style: TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.5),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 2,
-                            child: Material(
-                              color: Colors.transparent,
-                              child: InkWell(
-                                borderRadius: BorderRadius.circular(16),
-                                onTap: () {
-                                  FocusManager.instance.primaryFocus?.unfocus();
-                                  HapticFeedback.heavyImpact();
-                                  widget.onLogActivity('Successfully Paid Rs. ${totalAmount.toStringAsFixed(2)}', Icons.check_circle);
-
-                                  setState(() => _selectedFines.clear());
-                                  widget.onSelectionModeChanged(false);
-
-                                  Navigator.pop(context);
-
-                                  showDialog(
-                                    context: this.context,
-                                    barrierColor: Colors.black.withAlpha(80),
-                                    barrierDismissible: false,
-                                    builder: (BuildContext dialogContext) {
-                                      return BackdropFilter(
-                                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                                        child: Center(
-                                          child: Material(
-                                            color: Colors.transparent,
-                                            child: ClipRRect(
-                                              borderRadius: BorderRadius.circular(24),
-                                              child: BackdropFilter(
-                                                filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                                                child: Container(
-                                                  width: 220,
-                                                  padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
-                                                  decoration: BoxDecoration(
-                                                    color: Colors.white.withAlpha(40),
-                                                    borderRadius: BorderRadius.circular(24),
-                                                    border: Border.all(color: Colors.white.withAlpha(80), width: 1.5),
-                                                    boxShadow: [
-                                                      BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 40, offset: const Offset(0, 10))
-                                                    ],
-                                                  ),
-                                                  child: Column(
-                                                    mainAxisSize: MainAxisSize.min,
-                                                    children: [
-                                                      Container(
-                                                        padding: const EdgeInsets.all(16),
-                                                        decoration: BoxDecoration(
-                                                          color: Colors.greenAccent.withAlpha(40),
-                                                          shape: BoxShape.circle,
-                                                          border: Border.all(color: Colors.greenAccent.withAlpha(100), width: 2),
-                                                        ),
-                                                        child: const Icon(Icons.check_rounded, color: Colors.greenAccent, size: 40),
-                                                      ),
-                                                      const SizedBox(height: 20),
-                                                      const Text(
-                                                        'Payment Successful!',
-                                                        textAlign: TextAlign.center,
-                                                        style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  );
-
-                                  Future.delayed(const Duration(milliseconds: 2000), () {
-                                    if (mounted) {
-                                      Navigator.pop(this.context);
-                                    }
-                                  });
-                                },
-                                child: Container(
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withAlpha(50),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: Colors.white.withAlpha(120), width: 1.2),
-                                    boxShadow: [
-                                      BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 10, offset: const Offset(0, 4)),
-                                    ],
-                                  ),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.verified_user_rounded, color: Colors.blue.shade900, size: 18),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        'CONFIRM',
-                                        style: TextStyle(color: Colors.blue.shade900, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.0),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
-                    ],
+                        const SizedBox(height: 10),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -539,7 +624,7 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                           ),
                           onPressed: () {
                             HapticFeedback.lightImpact();
-                            _showPaymentBottomSheet([fine]);
+                            _showPaymentDialog([fine]);
                           },
                           child: const Text('PAY NOW', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
                         ),
@@ -570,7 +655,7 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
 
   Widget _buildBulkPaymentBar() {
     final total = _selectedFines.isEmpty ? 0.0 : _calculateTotalSelectedAmount();
-    final finesToPay = _hardcodedFines.where((f) => _selectedFines.contains(f['id'])).toList();
+    final finesToPay = _pendingFines.where((f) => _selectedFines.contains(f['id'])).toList();
 
     return IgnorePointer(
       ignoring: _selectedFines.isEmpty,
@@ -616,7 +701,7 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                         elevation: 0,
                         minimumSize: const Size(0, 36),
                       ),
-                      onPressed: () => _showPaymentBottomSheet(finesToPay),
+                      onPressed: () => _showPaymentDialog(finesToPay),
                       child: const Text('PAY SELECTED', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12, letterSpacing: 0.5)),
                     ),
                   ],
@@ -650,18 +735,37 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
               tabs: const [Tab(text: 'PENDING'), Tab(text: 'PAID')],
             ),
           ),
-          body: Stack(
+          body: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: Colors.white))
+              : _errorMessage.isNotEmpty
+              ? Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 50),
+                const SizedBox(height: 16),
+                Text(_errorMessage, style: const TextStyle(color: Colors.white, fontSize: 16)),
+                const SizedBox(height: 16),
+                ElevatedButton(onPressed: _fetchFines, child: const Text('Retry'))
+              ],
+            ),
+          )
+              : Stack(
             children: [
               TabBarView(
                 controller: _tabController,
                 children: [
-                  ListView.builder(
+                  _pendingFines.isEmpty
+                      ? const Center(child: Text("No pending fines available.", style: TextStyle(color: Colors.black87)))
+                      : ListView.builder(
                     padding: const EdgeInsets.only(top: 20, left: 16, right: 16, bottom: 100),
                     itemCount: _pendingFines.length,
                     physics: const BouncingScrollPhysics(),
                     itemBuilder: (context, index) => _buildFineCard(_pendingFines[index], true),
                   ),
-                  ListView.builder(
+                  _paidFines.isEmpty
+                      ? const Center(child: Text("No paid fines history.", style: TextStyle(color: Colors.black87)))
+                      : ListView.builder(
                     padding: const EdgeInsets.only(top: 20, left: 16, right: 16, bottom: 100),
                     itemCount: _paidFines.length,
                     physics: const BouncingScrollPhysics(),
