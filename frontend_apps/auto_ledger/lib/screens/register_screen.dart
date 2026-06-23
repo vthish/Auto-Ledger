@@ -26,32 +26,82 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String _verificationId = '';
   Map<String, dynamic>? _registeredData;
 
+  // Memory leaks නවත්තන්න controllers dispose කිරීම
+  @override
+  void dispose() {
+    _nicController.dispose();
+    _nameController.dispose();
+    _mobileController.dispose();
+    _passwordController.dispose();
+    _otpController.dispose();
+    super.dispose();
+  }
+
   void _showToast(String message, {bool isError = false}) {
+    final topPadding = MediaQuery.of(context).padding.top;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            Icon(isError ? Icons.error_outline : Icons.check_circle_outline, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-          ],
-        ),
-        backgroundColor: isError ? Colors.redAccent : Colors.green.shade600,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
-        elevation: 6,
+        dismissDirection: DismissDirection.up,
+        margin: EdgeInsets.only(
+          bottom: screenHeight - topPadding - 100,
+          left: 16,
+          right: 16,
+        ),
+        content: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+              decoration: BoxDecoration(
+                color: isError ? Colors.redAccent.withAlpha(100) : Colors.black.withAlpha(80),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withAlpha(70),
+                  width: 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 10, spreadRadius: 1)
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(isError ? Icons.error_outline : Icons.check_circle_outline, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                ],
+              ),
+            ),
+          ),
+        ),
         duration: const Duration(seconds: 3),
       ),
     );
   }
 
   bool _validateInputs() {
-    if (_nicController.text.trim().isEmpty ||
-        _nameController.text.trim().isEmpty ||
-        _mobileController.text.trim().isEmpty ||
-        _passwordController.text.trim().isEmpty) {
-      _showToast('All fields are required!', isError: true);
+    FocusScope.of(context).unfocus();
+
+    if (_nicController.text.trim().isEmpty) {
+      _showToast('NIC Number is required', isError: true);
+      return false;
+    }
+    if (_nameController.text.trim().isEmpty) {
+      _showToast('Full Name is required', isError: true);
+      return false;
+    }
+    if (_mobileController.text.trim().isEmpty) {
+      _showToast('Mobile Number is required', isError: true);
+      return false;
+    }
+    if (_passwordController.text.trim().isEmpty) {
+      _showToast('Password is required', isError: true);
       return false;
     }
     if (_passwordController.text.trim().length < 8) {
@@ -118,6 +168,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _verifyOTP() async {
+    FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
     try {
       final credential = PhoneAuthProvider.credential(
@@ -204,19 +255,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     children: [
                       Expanded(
                         child: TextButton(
+                          style: TextButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: Colors.white.withAlpha(100), width: 1.5),
+                            ),
+                          ),
                           onPressed: () {
                             Navigator.pop(context);
                             setState(() => _isLoading = false);
                           },
-                          child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+                          child: const Text('Cancel', style: TextStyle(color: Colors.white)),
                         ),
                       ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.cyanAccent.shade700,
+                            backgroundColor: Colors.white.withAlpha(50),
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: Colors.white.withAlpha(150), width: 1.5),
+                            ),
                           ),
                           onPressed: _verifyOTP,
                           child: const Text('Verify', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -230,54 +292,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildDynamicGlassBackground() {
-    return RepaintBoundary(
-      child: Stack(
-        children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-          ),
-          Positioned(
-            top: 50,
-            right: -80,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                color: Colors.tealAccent.withAlpha(40),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -100,
-            left: -50,
-            child: Container(
-              width: 350,
-              height: 350,
-              decoration: BoxDecoration(
-                color: Colors.blueAccent.withAlpha(50),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
-              child: const SizedBox(),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -332,7 +346,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       body: Stack(
         children: [
-          _buildDynamicGlassBackground(),
+          const _RegisterBackground(),
           Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
@@ -377,11 +391,76 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         context,
                         MaterialPageRoute(builder: (_) => const LoginScreen()),
                       ),
-                      child: const Text('Already have an account? Login', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+                      child: RichText(
+                        text: const TextSpan(
+                          text: 'Already have an account? ',
+                          style: TextStyle(color: Colors.white70, fontSize: 13),
+                          children: [
+                            TextSpan(
+                              text: 'Login',
+                              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Background එක වෙනම වෙන් කරා UI එක fast වෙන්න.
+class _RegisterBackground extends StatelessWidget {
+  const _RegisterBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
+          Positioned(
+            top: 50,
+            right: -80,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                color: Colors.tealAccent.withAlpha(40),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -100,
+            left: -50,
+            child: Container(
+              width: 350,
+              height: 350,
+              decoration: BoxDecoration(
+                color: Colors.blueAccent.withAlpha(50),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+              child: const SizedBox(),
             ),
           ),
         ],

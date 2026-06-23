@@ -37,6 +37,17 @@ class _LoginScreenState extends State<LoginScreen> {
     _checkBiometricStatus();
   }
 
+  @override
+  void dispose() {
+    _nicController.dispose();
+    _passwordController.dispose();
+    _otpController.dispose();
+    _forgotNicController.dispose();
+    _forgotPhoneController.dispose();
+    _newPasswordController.dispose();
+    super.dispose();
+  }
+
   Future<void> _checkBiometricStatus() async {
     final isEnabled = await SettingsUtil.isBiometricEnabled();
     setState(() {
@@ -44,29 +55,65 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  void _showToast(String message, {bool isError = false}) {
+  void _showToast(String message, {bool isError = false, bool isLoginSuccess = false}) {
+    final topPadding = MediaQuery.of(context).padding.top;
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Row(
-          children: [
-            Icon(isError ? Icons.error_outline : Icons.check_circle_outline, color: Colors.white),
-            const SizedBox(width: 12),
-            Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-          ],
-        ),
-        backgroundColor: isError ? Colors.redAccent : Colors.green.shade600,
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        margin: const EdgeInsets.all(16),
-        elevation: 6,
+        dismissDirection: isLoginSuccess ? DismissDirection.down : DismissDirection.up,
+        margin: EdgeInsets.only(
+          bottom: isLoginSuccess ? 16.0 : (screenHeight - topPadding - 100),
+          left: 16,
+          right: 16,
+        ),
+        content: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+              decoration: BoxDecoration(
+                color: isLoginSuccess
+                    ? Colors.green.shade800.withAlpha(220)
+                    : (isError ? Colors.redAccent.withAlpha(100) : Colors.black.withAlpha(80)),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withAlpha(70),
+                  width: 1.0,
+                ),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 10, spreadRadius: 1)
+                ],
+              ),
+              child: Row(
+                children: [
+                  Icon(isError ? Icons.error_outline : Icons.check_circle_outline, color: Colors.white),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                ],
+              ),
+            ),
+          ),
+        ),
         duration: const Duration(seconds: 3),
       ),
     );
   }
 
   Future<void> _handleLogin() async {
-    if (_nicController.text.trim().isEmpty || _passwordController.text.trim().isEmpty) {
-      _showToast('Please enter both NIC and Password', isError: true);
+    FocusScope.of(context).unfocus();
+
+    if (_nicController.text.trim().isEmpty) {
+      _showToast('NIC Number is required', isError: true);
+      return;
+    }
+    if (_passwordController.text.trim().isEmpty) {
+      _showToast('Password is required', isError: true);
       return;
     }
 
@@ -80,7 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (result['success'] == true && mounted) {
-        _showToast('Login Successful!');
+        _showToast('Login Successful!', isLoginSuccess: true);
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -132,6 +179,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _verifyOTP({required bool isDeviceVerification}) async {
+    FocusScope.of(context).unfocus();
     setState(() => _isLoading = true);
     try {
       final credential = PhoneAuthProvider.credential(
@@ -165,7 +213,7 @@ class _LoginScreenState extends State<LoginScreen> {
           deviceId
       );
       if (isVerified && mounted) {
-        _showToast('Device verified successfully!');
+        _showToast('Device verified successfully!', isLoginSuccess: true);
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -180,11 +228,17 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleForgotPasswordCheck() async {
+    FocusScope.of(context).unfocus();
+
     final nic = _forgotNicController.text.trim();
     final phone = _forgotPhoneController.text.trim();
 
-    if (nic.isEmpty || phone.isEmpty) {
-      _showToast('NIC and Phone Number are required', isError: true);
+    if (nic.isEmpty) {
+      _showToast('NIC Number is required', isError: true);
+      return;
+    }
+    if (phone.isEmpty) {
+      _showToast('Phone Number is required', isError: true);
       return;
     }
 
@@ -204,7 +258,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handlePasswordReset() async {
+    FocusScope.of(context).unfocus();
+
     final newPassword = _newPasswordController.text.trim();
+
+    if (newPassword.isEmpty) {
+      _showToast('New Password is required', isError: true);
+      return;
+    }
     if (newPassword.length < 8) {
       _showToast('Password must be at least 8 characters', isError: true);
       return;
@@ -220,7 +281,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (success && mounted) {
         Navigator.pop(context);
-        _showToast('Password reset successfully! Please login.');
+        _showToast('Password reset successfully! Please login.', isLoginSuccess: true);
         _forgotNicController.clear();
         _forgotPhoneController.clear();
         _newPasswordController.clear();
@@ -291,19 +352,30 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       Expanded(
                         child: TextButton(
+                          style: TextButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: Colors.white.withAlpha(100), width: 1.5),
+                            ),
+                          ),
                           onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+                          child: const Text('Cancel', style: TextStyle(color: Colors.white)),
                         ),
                       ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.cyanAccent.shade700,
+                            backgroundColor: Colors.white.withAlpha(50),
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: Colors.white.withAlpha(150), width: 1.5),
+                            ),
                           ),
                           onPressed: _handleForgotPasswordCheck,
-                          child: const Text('Next'),
+                          child: const Text('Next', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],
@@ -370,19 +442,30 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       Expanded(
                         child: TextButton(
+                          style: TextButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: Colors.white.withAlpha(100), width: 1.5),
+                            ),
+                          ),
                           onPressed: () {
                             Navigator.pop(context);
                             setState(() => _isLoading = false);
                           },
-                          child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+                          child: const Text('Cancel', style: TextStyle(color: Colors.white)),
                         ),
                       ),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.cyanAccent.shade700,
+                            backgroundColor: Colors.white.withAlpha(50),
                             foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: Colors.white.withAlpha(150), width: 1.5),
+                            ),
                           ),
                           onPressed: () => _verifyOTP(isDeviceVerification: isDeviceVerification),
                           child: const Text('Verify', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -443,9 +526,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     height: 50,
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.cyanAccent.shade700,
+                        backgroundColor: Colors.white.withAlpha(50),
                         foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          side: BorderSide(color: Colors.white.withAlpha(150), width: 1.5),
+                        ),
                       ),
                       onPressed: _handlePasswordReset,
                       child: const Text('Save Password', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -460,60 +547,12 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Widget _buildDynamicGlassBackground() {
-    return RepaintBoundary(
-      child: Stack(
-        children: [
-          Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-          ),
-          Positioned(
-            top: 100,
-            left: -80,
-            child: Container(
-              width: 300,
-              height: 300,
-              decoration: BoxDecoration(
-                color: Colors.cyanAccent.withAlpha(40),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: -50,
-            right: -50,
-            child: Container(
-              width: 250,
-              height: 250,
-              decoration: BoxDecoration(
-                color: Colors.deepPurpleAccent.withAlpha(60),
-                shape: BoxShape.circle,
-              ),
-            ),
-          ),
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
-              child: const SizedBox(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
-          _buildDynamicGlassBackground(),
+          const _LoginBackground(),
           Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -637,14 +676,76 @@ class _LoginScreenState extends State<LoginScreen> {
                           MaterialPageRoute(builder: (_) => const RegisterScreen()),
                         );
                       },
-                      child: const Text(
-                        'New Driver? Register Here',
-                        style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
+                      child: RichText(
+                        text: const TextSpan(
+                          text: 'New Driver? ',
+                          style: TextStyle(color: Colors.white70, fontSize: 13),
+                          children: [
+                            TextSpan(
+                              text: 'Register Here',
+                              style: TextStyle(fontWeight: FontWeight.w600, color: Colors.white, fontSize: 13),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// Background එක වෙනම වෙන් කරා UI එක fast වෙන්න.
+class _LoginBackground extends StatelessWidget {
+  const _LoginBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: Stack(
+        children: [
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+          ),
+          Positioned(
+            top: 100,
+            left: -80,
+            child: Container(
+              width: 300,
+              height: 300,
+              decoration: BoxDecoration(
+                color: Colors.cyanAccent.withAlpha(40),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -50,
+            right: -50,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                color: Colors.deepPurpleAccent.withAlpha(60),
+                shape: BoxShape.circle,
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+              child: const SizedBox(),
             ),
           ),
         ],

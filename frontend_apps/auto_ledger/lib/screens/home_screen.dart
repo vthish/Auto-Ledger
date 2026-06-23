@@ -1045,6 +1045,7 @@ class _HomeScreenState extends State<HomeScreen> {
           extendBody: true,
           extendBodyBehindAppBar: true,
           appBar: AppBar(
+            automaticallyImplyLeading: false,
             backgroundColor: const Color(0xFF1A2980).withAlpha(217),
             flexibleSpace: ClipRect(
               child: BackdropFilter(
