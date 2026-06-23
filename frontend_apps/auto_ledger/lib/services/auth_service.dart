@@ -29,7 +29,7 @@ class AuthService {
     }
   }
 
-  static Future<bool> loginUser(String nicNo, String password, String deviceId) async {
+  static Future<Map<String, dynamic>> loginUser(String nicNo, String password, String deviceId) async {
     try {
       final response = await ApiService.dio.post(
         '/auth/user/login',
@@ -42,9 +42,67 @@ class AuthService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         final token = response.data['accessToken'];
         await SecureStorage.saveToken(token);
+        return {'success': true};
+      }
+      return {'success': false};
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 403 && e.response?.data['code'] == 'DEVICE_MISMATCH') {
+        return {
+          'success': false,
+          'isDeviceMismatch': true,
+          'phone': e.response?.data['phone']
+        };
+      }
+      rethrow;
+    }
+  }
+
+  static Future<bool> verifyNewDevice(String nicNo, String deviceId) async {
+    try {
+      final response = await ApiService.dio.post(
+        '/auth/user/verify-device',
+        data: {
+          'nicNo': nicNo,
+          'deviceId': deviceId,
+        },
+      );
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final token = response.data['accessToken'];
+        await SecureStorage.saveToken(token);
         return true;
       }
       return false;
+    } on DioException {
+      rethrow;
+    }
+  }
+
+  static Future<bool> forgotPasswordCheck(String nicNo, String phone) async {
+    try {
+      final response = await ApiService.dio.post(
+        '/auth/user/forgot-password-check',
+        data: {
+          'nicNo': nicNo,
+          'mobilePhoneNo': phone,
+        },
+      );
+      return response.statusCode == 200 || response.statusCode == 201;
+    } on DioException {
+      rethrow;
+    }
+  }
+
+  static Future<bool> resetPassword(String nicNo, String phone, String newPassword) async {
+    try {
+      final response = await ApiService.dio.post(
+        '/auth/user/reset-password',
+        data: {
+          'nicNo': nicNo,
+          'mobilePhoneNo': phone,
+          'newPassword': newPassword,
+        },
+      );
+      return response.statusCode == 200 || response.statusCode == 201;
     } on DioException {
       rethrow;
     }

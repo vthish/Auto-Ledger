@@ -57,7 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!_hasShownPointsWarning) {
         final points = _licenseData?['points'] ?? 0;
 
-        // පෙන්විය යුත්තේ අවදානම් කලාප වලදී පමණි
+        // Show warning only in risk zones
         final bool isApproachingSuspension = (points >= 20 && points <= 23) ||
             (points >= 45 && points <= 49) ||
             (points >= 80 && points <= 99);

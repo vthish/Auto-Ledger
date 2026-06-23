@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
@@ -140,7 +141,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       final isVerified = await AuthService.verifyRegistration(_registeredData!['nicNo']);
       if (isVerified && mounted) {
-        _showToast('Registration & Verification Successful!');
+        _showToast('Registration Successful!');
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -158,30 +159,168 @@ class _RegisterScreenState extends State<RegisterScreen> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text('Enter OTP'),
-        content: TextField(
-          controller: _otpController,
-          keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'OTP Code',
-            prefixIcon: Icon(Icons.security),
+      barrierColor: Colors.black.withAlpha(200),
+      builder: (BuildContext context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(25),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.white.withAlpha(50), width: 1.5),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.message, color: Colors.white, size: 40),
+                  const SizedBox(height: 15),
+                  const Text('Enter OTP', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 15),
+                  const Text(
+                    'We sent an OTP to your mobile number. Please enter it to complete registration.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: _otpController,
+                    keyboardType: TextInputType.number,
+                    style: const TextStyle(color: Colors.white, fontSize: 20, letterSpacing: 8),
+                    textAlign: TextAlign.center,
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: Colors.white.withAlpha(20),
+                      hintText: '••••••',
+                      hintStyle: const TextStyle(color: Colors.white54, letterSpacing: 8),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(15), borderSide: BorderSide.none),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            setState(() => _isLoading = false);
+                          },
+                          child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+                        ),
+                      ),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.cyanAccent.shade700,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                          onPressed: _verifyOTP,
+                          child: const Text('Verify', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildDynamicGlassBackground() {
+    return Stack(
+      children: [
+        Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF0F2027), Color(0xFF203A43), Color(0xFF2C5364)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
           ),
         ),
-        actions: [
-          TextButton(
+        Positioned(
+          top: 50,
+          right: -80,
+          child: Container(
+            width: 300,
+            height: 300,
+            decoration: BoxDecoration(
+              color: Colors.tealAccent.withAlpha(40),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: -100,
+          left: -50,
+          child: Container(
+            width: 350,
+            height: 350,
+            decoration: BoxDecoration(
+              color: Colors.blueAccent.withAlpha(50),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ),
+        Positioned.fill(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
+            child: Container(color: Colors.transparent),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String labelText,
+    required IconData icon,
+    bool isPassword = false,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: TextField(
+        controller: controller,
+        obscureText: isPassword && _obscurePassword,
+        keyboardType: keyboardType,
+        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+        decoration: InputDecoration(
+          labelText: labelText,
+          labelStyle: const TextStyle(color: Colors.white70),
+          prefixIcon: Icon(icon, color: Colors.white70),
+          filled: true,
+          fillColor: Colors.white.withAlpha(20),
+          suffixIcon: isPassword
+              ? IconButton(
+            icon: Icon(
+              _obscurePassword ? Icons.visibility_off : Icons.visibility,
+              color: Colors.white70,
+            ),
             onPressed: () {
-              Navigator.pop(context);
-              setState(() => _isLoading = false);
+              setState(() {
+                _obscurePassword = !_obscurePassword;
+              });
             },
-            child: const Text('Cancel'),
+          )
+              : null,
+          enabledBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: Colors.white.withAlpha(40)),
+            borderRadius: BorderRadius.circular(16),
           ),
-          ElevatedButton(
-            onPressed: _verifyOTP,
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A2980), foregroundColor: Colors.white),
-            child: const Text('Verify'),
+          focusedBorder: OutlineInputBorder(
+            borderSide: const BorderSide(color: Colors.cyanAccent, width: 1.5),
+            borderRadius: BorderRadius.circular(16),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -189,117 +328,61 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF1A2980), Color(0xFF26D0CE)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
-            child: GlassContainer(
-              width: double.infinity,
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Register Driver',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
-                  ),
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: _nicController,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'NIC Number',
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      enabledBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.white54), borderRadius: BorderRadius.circular(12)),
-                      focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.white), borderRadius: BorderRadius.circular(12)),
+      body: Stack(
+        children: [
+          _buildDynamicGlassBackground(),
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
+              child: GlassContainer(
+                width: double.infinity,
+                padding: const EdgeInsets.all(28.0),
+                borderRadius: 24.0,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Register Driver',
+                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: 1.2),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _nameController,
-                    autocorrect: false,
-                    enableSuggestions: false,
-                    keyboardType: TextInputType.name,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Full Name',
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      enabledBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.white54), borderRadius: BorderRadius.circular(12)),
-                      focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.white), borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _mobileController,
-                    keyboardType: TextInputType.phone,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Mobile Number (+94...)',
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      enabledBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.white54), borderRadius: BorderRadius.circular(12)),
-                      focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.white), borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _passwordController,
-                    obscureText: _obscurePassword,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      labelStyle: const TextStyle(color: Colors.white70),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
-                          color: Colors.white70,
+                    const SizedBox(height: 32),
+                    _buildTextField(controller: _nicController, labelText: 'NIC Number', icon: Icons.badge),
+                    _buildTextField(controller: _nameController, labelText: 'Full Name', icon: Icons.person),
+                    _buildTextField(controller: _mobileController, labelText: 'Mobile Number (+94...)', icon: Icons.phone, keyboardType: TextInputType.phone),
+                    _buildTextField(controller: _passwordController, labelText: 'Password', icon: Icons.lock, isPassword: true),
+
+                    const SizedBox(height: 16),
+                    if (_isLoading)
+                      const CircularProgressIndicator(color: Colors.cyanAccent)
+                    else
+                      SizedBox(
+                        width: double.infinity,
+                        height: 55,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF0F2027),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                          ),
+                          onPressed: _handleRegister,
+                          child: const Text('REGISTER', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 1.5)),
                         ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
                       ),
-                      enabledBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.white54), borderRadius: BorderRadius.circular(12)),
-                      focusedBorder: OutlineInputBorder(borderSide: const BorderSide(color: Colors.white), borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  if (_isLoading)
-                    const CircularProgressIndicator(color: Colors.white)
-                  else
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: const Color(0xFF1A2980),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onPressed: _handleRegister,
-                        child: const Text('REGISTER', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 24),
+                    TextButton(
+                      onPressed: () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
                       ),
+                      child: const Text('Already have an account? Login', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
                     ),
-                  const SizedBox(height: 16),
-                  TextButton(
-                    onPressed: () => Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                    ),
-                    child: const Text('Already have an account? Login', style: TextStyle(color: Colors.white70)),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
