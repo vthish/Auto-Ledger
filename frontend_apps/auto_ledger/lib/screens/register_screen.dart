@@ -26,9 +26,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String _verificationId = '';
   Map<String, dynamic>? _registeredData;
 
-  // Memory leaks නවත්තන්න controllers dispose කිරීම
+  OverlayEntry? _overlayEntry;
+
   @override
   void dispose() {
+    _overlayEntry?.remove();
     _nicController.dispose();
     _nameController.dispose();
     _mobileController.dispose();
@@ -38,51 +40,134 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   void _showToast(String message, {bool isError = false}) {
-    final topPadding = MediaQuery.of(context).padding.top;
-    final screenHeight = MediaQuery.of(context).size.height;
+    _overlayEntry?.remove();
+    _overlayEntry = null;
 
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        behavior: SnackBarBehavior.floating,
-        dismissDirection: DismissDirection.up,
-        margin: EdgeInsets.only(
-          bottom: screenHeight - topPadding - 100,
-          left: 16,
-          right: 16,
-        ),
-        content: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-              decoration: BoxDecoration(
-                color: isError ? Colors.redAccent.withAlpha(100) : Colors.black.withAlpha(80),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.white.withAlpha(70),
-                  width: 1.0,
+    final topPadding = MediaQuery.of(context).padding.top;
+
+    _overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: topPadding + 20,
+        left: 16,
+        right: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOutBack,
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value.clamp(0.0, 1.0),
+                child: Transform.translate(
+                  offset: Offset(0, -(1 - value) * 20),
+                  child: child,
                 ),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 10, spreadRadius: 1)
-                ],
-              ),
-              child: Row(
-                children: [
-                  Icon(isError ? Icons.error_outline : Icons.check_circle_outline, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                ],
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: isError ? Colors.redAccent.withAlpha(100) : Colors.black.withAlpha(80),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withAlpha(70),
+                      width: 1.0,
+                    ),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 10, spreadRadius: 1)
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(isError ? Icons.error_outline : Icons.info_outline, color: Colors.white),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
         ),
-        duration: const Duration(seconds: 3),
       ),
     );
+
+    Navigator.of(context, rootNavigator: true).overlay?.insert(_overlayEntry!);
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (_overlayEntry != null && _overlayEntry!.mounted) {
+        _overlayEntry!.remove();
+        _overlayEntry = null;
+      }
+    });
+  }
+
+  void _showGlobalSuccessToast(OverlayState overlay, String message) {
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (context) => Positioned(
+        bottom: 120.0,
+        left: 16,
+        right: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOutBack,
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value.clamp(0.0, 1.0),
+                child: Transform.translate(
+                  offset: Offset(0, (1 - value) * 20),
+                  child: child,
+                ),
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade800.withAlpha(230),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withAlpha(70),
+                      width: 1.0,
+                    ),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 10, spreadRadius: 1)
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle_outline, color: Colors.white),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(entry);
+
+    Future.delayed(const Duration(seconds: 1), () {
+      if (entry.mounted) {
+        entry.remove();
+      }
+    });
   }
 
   bool _validateInputs() {
@@ -169,6 +254,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _verifyOTP() async {
     FocusScope.of(context).unfocus();
+
+    if (_otpController.text.trim().isEmpty) {
+      _showToast('Please enter the OTP', isError: true);
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       final credential = PhoneAuthProvider.credential(
@@ -192,11 +283,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       final isVerified = await AuthService.verifyRegistration(_registeredData!['nicNo']);
       if (isVerified && mounted) {
-        _showToast('Registration Successful!');
+        final overlay = Navigator.of(context, rootNavigator: true).overlay;
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
+
+        if (overlay != null) {
+          _showGlobalSuccessToast(overlay, 'Registration Successful!');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -415,7 +511,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 }
 
-// Background එක වෙනම වෙන් කරා UI එක fast වෙන්න.
 class _RegisterBackground extends StatelessWidget {
   const _RegisterBackground();
 

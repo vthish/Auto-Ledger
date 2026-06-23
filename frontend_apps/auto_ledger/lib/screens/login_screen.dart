@@ -31,6 +31,8 @@ class _LoginScreenState extends State<LoginScreen> {
   String _verificationId = '';
   String? _registeredPhone;
 
+  OverlayEntry? _overlayEntry;
+
   @override
   void initState() {
     super.initState();
@@ -39,6 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
+    _overlayEntry?.remove();
     _nicController.dispose();
     _passwordController.dispose();
     _otpController.dispose();
@@ -55,54 +58,138 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  void _showToast(String message, {bool isError = false, bool isLoginSuccess = false}) {
-    final topPadding = MediaQuery.of(context).padding.top;
-    final screenHeight = MediaQuery.of(context).size.height;
+  // Error Messages පෙන්නන්න විතරක් මේක පාවිච්චි කරනවා (උඩින් එන එක)
+  void _showToast(String message, {bool isError = false}) {
+    _overlayEntry?.remove();
+    _overlayEntry = null;
 
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        behavior: SnackBarBehavior.floating,
-        dismissDirection: isLoginSuccess ? DismissDirection.down : DismissDirection.up,
-        margin: EdgeInsets.only(
-          bottom: isLoginSuccess ? 16.0 : (screenHeight - topPadding - 100),
-          left: 16,
-          right: 16,
-        ),
-        content: ClipRRect(
-          borderRadius: BorderRadius.circular(16),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
-              decoration: BoxDecoration(
-                color: isLoginSuccess
-                    ? Colors.green.shade800.withAlpha(220)
-                    : (isError ? Colors.redAccent.withAlpha(100) : Colors.black.withAlpha(80)),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.white.withAlpha(70),
-                  width: 1.0,
+    final topPadding = MediaQuery.of(context).padding.top;
+
+    _overlayEntry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: topPadding + 20,
+        left: 16,
+        right: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOutBack,
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value.clamp(0.0, 1.0),
+                child: Transform.translate(
+                  offset: Offset(0, -(1 - value) * 20),
+                  child: child,
                 ),
-                boxShadow: [
-                  BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 10, spreadRadius: 1)
-                ],
-              ),
-              child: Row(
-                children: [
-                  Icon(isError ? Icons.error_outline : Icons.check_circle_outline, color: Colors.white),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
-                ],
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: isError ? Colors.redAccent.withAlpha(100) : Colors.black.withAlpha(80),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withAlpha(70),
+                      width: 1.0,
+                    ),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 10, spreadRadius: 1)
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(isError ? Icons.error_outline : Icons.info_outline, color: Colors.white),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
         ),
-        duration: const Duration(seconds: 3),
       ),
     );
+
+    Navigator.of(context, rootNavigator: true).overlay?.insert(_overlayEntry!);
+
+    Future.delayed(const Duration(seconds: 3), () {
+      if (_overlayEntry != null && _overlayEntry!.mounted) {
+        _overlayEntry!.remove();
+        _overlayEntry = null;
+      }
+    });
+  }
+
+  // Success Messages වෙනුවෙන් හදපු අලුත් Global Overlay එක (යටින් එන එක)
+  void _showGlobalSuccessToast(OverlayState overlay, String message) {
+    late OverlayEntry entry;
+    entry = OverlayEntry(
+      builder: (context) => Positioned(
+        bottom: 120.0, // Bottom Bar එකට වඩා ගොඩක් උඩින්
+        left: 16,
+        right: 16,
+        child: Material(
+          color: Colors.transparent,
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.0, end: 1.0),
+            duration: const Duration(milliseconds: 400),
+            curve: Curves.easeOutBack,
+            builder: (context, value, child) {
+              return Opacity(
+                opacity: value.clamp(0.0, 1.0),
+                child: Transform.translate(
+                  offset: Offset(0, (1 - value) * 20),
+                  child: child,
+                ),
+              );
+            },
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                  decoration: BoxDecoration(
+                    color: Colors.green.shade800.withAlpha(230),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withAlpha(70),
+                      width: 1.0,
+                    ),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 10, spreadRadius: 1)
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle_outline, color: Colors.white),
+                      const SizedBox(width: 12),
+                      Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    overlay.insert(entry);
+
+    // හරියටම තත්පර 1යි පෙන්වන්නේ
+    Future.delayed(const Duration(seconds: 1), () {
+      if (entry.mounted) {
+        entry.remove();
+      }
+    });
   }
 
   Future<void> _handleLogin() async {
@@ -127,11 +214,18 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (result['success'] == true && mounted) {
-        _showToast('Login Successful!', isLoginSuccess: true);
+        final overlay = Navigator.of(context, rootNavigator: true).overlay;
+
+        // Delay නැතුව කෙලින්ම Home Screen එකට යනවා
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
+
+        // Home Screen එකට ගියාට පස්සේ Success Toast එක දානවා (තත්පර 1ක් පෙන්වයි)
+        if (overlay != null) {
+          _showGlobalSuccessToast(overlay, 'Login Successful!');
+        }
       } else if (result['isDeviceMismatch'] == true && mounted) {
         _showToast('New device detected. Verification required.', isError: true);
         _registeredPhone = result['phone'];
@@ -180,6 +274,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _verifyOTP({required bool isDeviceVerification}) async {
     FocusScope.of(context).unfocus();
+
+    if (_otpController.text.trim().isEmpty) {
+      _showToast('Please enter the OTP', isError: true);
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
       final credential = PhoneAuthProvider.credential(
@@ -213,11 +313,16 @@ class _LoginScreenState extends State<LoginScreen> {
           deviceId
       );
       if (isVerified && mounted) {
-        _showToast('Device verified successfully!', isLoginSuccess: true);
+        final overlay = Navigator.of(context, rootNavigator: true).overlay;
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
+
+        if (overlay != null) {
+          _showGlobalSuccessToast(overlay, 'Device verified successfully!');
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -281,7 +386,12 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (success && mounted) {
         Navigator.pop(context);
-        _showToast('Password reset successfully! Please login.', isLoginSuccess: true);
+
+        final overlay = Navigator.of(context, rootNavigator: true).overlay;
+        if (overlay != null) {
+          _showGlobalSuccessToast(overlay, 'Password reset successfully! Please login.');
+        }
+
         _forgotNicController.clear();
         _forgotPhoneController.clear();
         _newPasswordController.clear();
@@ -664,7 +774,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       IconButton(
                         icon: const Icon(Icons.fingerprint, color: Colors.white, size: 45),
                         onPressed: () {
-                          _showToast('Biometric Login Coming Soon!', isError: false);
+                          _showToast('Biometric Login Coming Soon!');
                         },
                       ),
                       const SizedBox(height: 16),
@@ -700,7 +810,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// Background එක වෙනම වෙන් කරා UI එක fast වෙන්න.
 class _LoginBackground extends StatelessWidget {
   const _LoginBackground();
 
