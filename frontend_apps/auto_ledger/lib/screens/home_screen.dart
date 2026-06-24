@@ -517,10 +517,9 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white.withAlpha(15),
+            color: Colors.transparent,
             borderRadius: BorderRadius.circular(24),
             border: Border.all(color: Colors.white.withAlpha(40), width: 1.5),
-            boxShadow: [BoxShadow(color: Colors.black.withAlpha(15), blurRadius: 20, offset: const Offset(0, 8))],
           ),
           child: SizedBox(
             height: MediaQuery.of(context).size.height * 0.35,
@@ -756,14 +755,20 @@ class _QRDialogState extends State<_QRDialog> {
                     children: [
                       const Text('Show this to the Officer', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 20),
-                      Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                              color: Colors.white.withAlpha(15),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.white.withAlpha(40), width: 1.0)
-                          ),
-                          child: QrImageView(data: widget.qrToken, version: QrVersions.auto, size: 200.0, eyeStyle: const QrEyeStyle(eyeShape: QrEyeShape.square, color: Colors.white))
+                      ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                              child: Container(
+                                  padding: const EdgeInsets.all(16),
+                                  decoration: BoxDecoration(
+                                      color: Colors.white.withAlpha(140),
+                                      borderRadius: BorderRadius.circular(20),
+                                      border: Border.all(color: Colors.white.withAlpha(80), width: 1.5)
+                                  ),
+                                  child: QrImageView(data: widget.qrToken, version: QrVersions.auto, size: 200.0)
+                              )
+                          )
                       ),
                       const SizedBox(height: 20),
                       Text(_isScanned ? _formattedTime : '03:00', style: TextStyle(fontSize: 36, fontWeight: FontWeight.bold, color: _isScanned ? Colors.redAccent : Colors.white)),
