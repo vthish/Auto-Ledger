@@ -8,6 +8,7 @@ import '../services/api_service.dart';
 import '../utils/secure_storage.dart';
 import 'login_screen.dart';
 import 'fines_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -604,7 +605,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ) : null,
           body: SafeArea(
             top: _currentIndex == 0,
-            bottom: false, // මෙන්න මේකෙන් තමයි අර යටින් ආව සුදු පාට ගැප් එක අයින් කරේ!
+            bottom: false,
             child: _currentIndex == 0
                 ? _buildDashboard()
                 : _currentIndex == 1
@@ -616,7 +617,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 });
               },
             )
-                : const Center(child: Text('Profile Screen Coming Soon!')),
+                : const ProfileScreen(), // මෙතැන තමයි මම වෙනස් කරේ (ProfileScreen එකට යොමු කලා)
           ),
           bottomNavigationBar: AnimatedSlide(
             offset: _isSelectionMode ? const Offset(0, 2) : Offset.zero,
