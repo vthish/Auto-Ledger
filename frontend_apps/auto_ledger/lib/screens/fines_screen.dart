@@ -33,8 +33,7 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _tabController.addListener(_handleTabChange);
-
-    _fetchFines(); // Fetch from backend on load
+    _fetchFines();
   }
 
   void _handleTabChange() {
@@ -65,7 +64,6 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
         double totalAmount = 0.0;
         List<String> offenseNames = [];
 
-        // Extract offenses and calculate total amount
         if (f['offenses'] != null) {
           for (var o in f['offenses']) {
             final category = o['offenceCategory'];
@@ -76,7 +74,6 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
           }
         }
 
-        // Format officer name
         final officer = f['trafficOfficer'];
         final officerName = officer != null
             ? '${officer['name']} (${officer['badge_No']})'
@@ -89,11 +86,10 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
           'offenses': offenseNames.isNotEmpty ? offenseNames : ['Unknown Offense'],
           'status': f['status'],
           'officer': officerName,
-          'location': 'Not Specified', // Location is not stored in Fine model directly
+          'location': 'Not Specified',
           'dueDate': f['due_Date'],
         };
 
-        // PENDING, OVERDUE, COURT_CASE goes to Pending tab. PAID goes to Paid tab.
         if (f['status'] == 'PAID') {
           parsedPaid.add(mappedFine);
         } else {
@@ -126,10 +122,8 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
   }
 
   Future<void> _processPayment(List<Map<String, dynamic>> finesToPay, double totalAmount) async {
-    // Hide keyboard
     FocusManager.instance.primaryFocus?.unfocus();
 
-    // Show loading dialog
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -138,17 +132,15 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
 
     try {
       if (finesToPay.length == 1) {
-        // Single payment
         await ApiService.dio.post('/fines/${finesToPay.first['id']}/pay', data: {'amount': totalAmount});
       } else {
-        // Bulk payment
         final ids = finesToPay.map((f) => f['id'].toString()).toList();
         await ApiService.dio.post('/fines/pay-bulk', data: {'fineIds': ids, 'totalAmount': totalAmount});
       }
 
       if (!mounted) return;
-      Navigator.pop(context); // Close loading dialog
-      Navigator.pop(context); // Close payment bottom sheet/dialog
+      Navigator.pop(context);
+      Navigator.pop(context);
 
       HapticFeedback.heavyImpact();
       widget.onLogActivity('Successfully Paid Rs. ${totalAmount.toStringAsFixed(2)}', Icons.check_circle);
@@ -156,52 +148,52 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
       setState(() => _selectedFines.clear());
       widget.onSelectionModeChanged(false);
 
-      // Show Success Dialog
       showDialog(
         context: context,
-        barrierColor: Colors.black.withAlpha(80),
+        barrierColor: Colors.black.withAlpha(160),
         barrierDismissible: false,
         builder: (BuildContext dialogContext) {
           return BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
             child: Center(
               child: Material(
                 color: Colors.transparent,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(24),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                    child: Container(
-                      width: 220,
-                      padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withAlpha(40),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: Colors.white.withAlpha(80), width: 1.5),
-                        boxShadow: [
-                          BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 40, offset: const Offset(0, 10))
-                        ],
+                  child: Container(
+                    width: 220,
+                    padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Colors.white.withAlpha(40), Colors.white.withAlpha(15)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
                       ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.greenAccent.withAlpha(40),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.greenAccent.withAlpha(100), width: 2),
-                            ),
-                            child: const Icon(Icons.check_rounded, color: Colors.greenAccent, size: 40),
+                      borderRadius: BorderRadius.circular(24),
+                      border: Border.all(color: Colors.white.withAlpha(60), width: 1.0),
+                      boxShadow: [
+                        BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 40, offset: const Offset(0, 10))
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.greenAccent.withAlpha(30),
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.greenAccent.withAlpha(60), width: 1.5),
                           ),
-                          const SizedBox(height: 20),
-                          const Text(
-                            'Payment Successful!',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 0.5),
-                          ),
-                        ],
-                      ),
+                          child: const Icon(Icons.check_rounded, color: Colors.greenAccent, size: 40),
+                        ),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'Payment Successful!',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w900, letterSpacing: 0.5),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -211,25 +203,55 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
         },
       );
 
-      // Close success dialog after 2 seconds and refresh fines
       Future.delayed(const Duration(milliseconds: 2000), () {
         if (mounted) {
-          Navigator.pop(context); // Close success dialog
-          _fetchFines(); // Refresh lists
+          Navigator.pop(context);
+          _fetchFines();
         }
       });
 
     } catch (e) {
       if (!mounted) return;
-      Navigator.pop(context); // Close loading dialog
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: Colors.red.shade800,
-          behavior: SnackBarBehavior.floating,
-          content: const Text('Payment Failed! Please try again.', style: TextStyle(color: Colors.white)),
-        ),
-      );
+      Navigator.pop(context);
+      _showGlassToast('Payment Failed! Please try again.', isError: true);
     }
+  }
+
+  void _showGlassToast(String message, {bool isError = false}) {
+    final topPadding = MediaQuery.of(context).padding.top;
+    final entry = OverlayEntry(
+      builder: (context) => Positioned(
+        top: topPadding + 10,
+        left: 20,
+        right: 20,
+        child: Material(
+          color: Colors.transparent,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                decoration: BoxDecoration(
+                  color: isError ? Colors.redAccent.withAlpha(50) : Colors.green.shade600.withAlpha(50),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withAlpha(100), width: 1.0),
+                ),
+                child: Row(
+                  children: [
+                    Icon(isError ? Icons.error_outline_rounded : Icons.check_circle_outline_rounded, color: Colors.white, size: 28),
+                    const SizedBox(width: 12),
+                    Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    Navigator.of(context, rootNavigator: true).overlay?.insert(entry);
+    Future.delayed(const Duration(seconds: 3), () => entry.remove());
   }
 
   @override
@@ -255,7 +277,12 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
     HapticFeedback.selectionClick();
     final wasEmpty = _selectedFines.isEmpty;
     setState(() {
-      if (!_selectedFines.remove(id)) _selectedFines.add(id);
+      if (!_selectedFines.remove(id)) {
+        _selectedFines.add(id);
+        widget.onLogActivity('Selected Fine ${_formatId(id)}', Icons.touch_app_rounded);
+      } else {
+        widget.onLogActivity('Deselected Fine ${_formatId(id)}', Icons.touch_app_rounded);
+      }
     });
     if (wasEmpty != _selectedFines.isEmpty) {
       widget.onSelectionModeChanged(_selectedFines.isNotEmpty);
@@ -276,14 +303,14 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
 
     showDialog(
       context: context,
-      barrierColor: Colors.black.withAlpha(150),
+      barrierColor: Colors.black.withAlpha(160),
       builder: (BuildContext context) {
         bool isCvvObscured = true;
 
         return StatefulBuilder(
           builder: (context, setModalState) {
             return BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
               child: Dialog(
                 backgroundColor: Colors.transparent,
                 elevation: 0,
@@ -291,31 +318,35 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                 child: Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: Colors.white.withAlpha(40),
+                    gradient: LinearGradient(
+                      colors: [Colors.white.withAlpha(40), Colors.white.withAlpha(15)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
                     borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: Colors.white.withAlpha(100), width: 1.5),
+                    border: Border.all(color: Colors.white.withAlpha(60), width: 1.0),
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 25, offset: const Offset(0, 10)),
+                      BoxShadow(color: Colors.black.withAlpha(30), blurRadius: 40, offset: const Offset(0, 10)),
                     ],
                   ),
                   child: SingleChildScrollView(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.payment_rounded, size: 40, color: Colors.blue.shade900),
+                        const Icon(Icons.payment_rounded, size: 40, color: Colors.white),
                         const SizedBox(height: 12),
                         Text(
                           isBulk ? 'Bulk Payment' : 'Pay Fine',
-                          style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.blue.shade900),
+                          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
                         ),
                         const SizedBox(height: 20),
 
                         Container(
-                          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                          padding: const EdgeInsets.all(20),
                           decoration: BoxDecoration(
-                            color: Colors.white.withAlpha(60),
+                            color: Colors.white.withAlpha(15),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.white.withAlpha(120), width: 1),
+                            border: Border.all(color: Colors.white.withAlpha(40), width: 1),
                           ),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -328,18 +359,18 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                                     children: [
                                       Text(
                                         isBulk ? 'Bulk Payment' : 'Pay Fine',
-                                        style: TextStyle(color: Colors.blue.shade900, fontWeight: FontWeight.w900, fontSize: 14, letterSpacing: 0.5),
+                                        style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w900, fontSize: 14),
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
                                         isBulk ? '${finesToPay.length} Fines Selected' : 'ID: ${_formatId(finesToPay.first['id'])}',
-                                        style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 11),
+                                        style: const TextStyle(color: Colors.white60, fontWeight: FontWeight.w600, fontSize: 11),
                                       ),
                                     ],
                                   ),
                                   Text(
                                     'Rs. ${totalAmount.toStringAsFixed(2)}',
-                                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.red.shade900),
+                                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: Colors.redAccent),
                                   ),
                                 ],
                               ),
@@ -349,7 +380,7 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                                 child: Row(
                                   children: List.generate(
                                       30,
-                                          (index) => Expanded(child: Container(height: 1.2, color: index % 2 == 0 ? Colors.white.withAlpha(150) : Colors.transparent))
+                                          (index) => Expanded(child: Container(height: 1.2, color: index % 2 == 0 ? Colors.white.withAlpha(40) : Colors.transparent))
                                   ),
                                 ),
                               ),
@@ -358,7 +389,7 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                                 'Card Number',
                                 Icons.credit_card_rounded,
                                 true,
-                                fontSize: 16,
+                                fontSize: 15,
                                 inputFormatters: [
                                   FilteringTextInputFormatter.digitsOnly,
                                   LengthLimitingTextInputFormatter(16),
@@ -389,7 +420,7 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                                         suffixIcon: IconButton(
                                           icon: Icon(
                                             isCvvObscured ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                                            color: Colors.blue.shade800,
+                                            color: Colors.white70,
                                             size: 18,
                                           ),
                                           onPressed: () {
@@ -415,59 +446,25 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                         Row(
                           children: [
                             Expanded(
-                              flex: 1,
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(16),
-                                  onTap: () => Navigator.pop(context),
-                                  child: Container(
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withAlpha(20),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: Colors.white.withAlpha(80), width: 1.2),
-                                    ),
-                                    alignment: Alignment.center,
-                                    child: const Text(
-                                      'Cancel',
-                                      style: TextStyle(color: Colors.black54, fontSize: 13, fontWeight: FontWeight.w800, letterSpacing: 0.5),
-                                    ),
-                                  ),
-                                ),
+                              child: TextButton(
+                                style: TextButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Cancel', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
                               ),
                             ),
                             const SizedBox(width: 12),
                             Expanded(
                               flex: 2,
-                              child: Material(
-                                color: Colors.transparent,
-                                child: InkWell(
-                                  borderRadius: BorderRadius.circular(16),
-                                  onTap: () => _processPayment(finesToPay, totalAmount),
-                                  child: Container(
-                                    height: 48,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withAlpha(50),
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: Colors.white.withAlpha(120), width: 1.2),
-                                      boxShadow: [
-                                        BoxShadow(color: Colors.black.withAlpha(5), blurRadius: 10, offset: const Offset(0, 4)),
-                                      ],
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(Icons.verified_user_rounded, color: Colors.blue.shade900, size: 18),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          'CONFIRM',
-                                          style: TextStyle(color: Colors.blue.shade900, fontSize: 14, fontWeight: FontWeight.w900, letterSpacing: 1.0),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  backgroundColor: Colors.white.withAlpha(40),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: Colors.white.withAlpha(60))),
                                 ),
+                                onPressed: () => _processPayment(finesToPay, totalAmount),
+                                child: const Text('CONFIRM', style: TextStyle(fontWeight: FontWeight.w900, letterSpacing: 0.5)),
                               ),
                             ),
                           ],
@@ -488,24 +485,23 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
   Widget _buildPaymentTextField(String label, IconData icon, bool isNumber, {bool isObscure = false, List<TextInputFormatter>? inputFormatters, Widget? suffixIcon, double? fontSize}) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(70),
+        color: Colors.white.withAlpha(15),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withAlpha(150), width: 1.0),
+        border: Border.all(color: Colors.white.withAlpha(40), width: 1.0),
       ),
       child: TextField(
         keyboardType: isNumber ? TextInputType.number : TextInputType.text,
         obscureText: isObscure,
         inputFormatters: inputFormatters,
-        style: TextStyle(fontWeight: FontWeight.w800, color: Colors.black87, fontSize: fontSize ?? 15),
+        style: TextStyle(fontWeight: FontWeight.w800, color: Colors.white, fontSize: fontSize ?? 15),
         decoration: InputDecoration(
           isDense: true,
           labelText: label,
-          labelStyle: const TextStyle(color: Colors.black54, fontWeight: FontWeight.w700, fontSize: 12),
-          prefixIcon: Icon(icon, color: Colors.blue.shade800, size: 18),
-          prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+          labelStyle: const TextStyle(color: Colors.white60, fontWeight: FontWeight.w600, fontSize: 12),
+          prefixIcon: Icon(icon, color: Colors.white70, size: 18),
           suffixIcon: suffixIcon,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         ),
       ),
     );
@@ -515,11 +511,11 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
     return RepaintBoundary(
       child: Stack(
         children: [
-          Container(color: const Color(0xFFF0F4FF)),
-          Positioned(top: -100, left: -50, child: Container(width: 300, height: 300, decoration: BoxDecoration(color: const Color(0xFF1A2980).withAlpha(100), shape: BoxShape.circle))),
-          Positioned(bottom: 50, right: -100, child: Container(width: 350, height: 350, decoration: BoxDecoration(color: Colors.greenAccent.withAlpha(80), shape: BoxShape.circle))),
-          Positioned(top: 250, right: 20, child: Container(width: 200, height: 200, decoration: BoxDecoration(color: Colors.purpleAccent.withAlpha(60), shape: BoxShape.circle))),
-          Positioned.fill(child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 80, sigmaY: 80), child: Container(color: Colors.transparent))),
+          Container(color: const Color(0xFF0B0F19)),
+          Positioned(top: -50, left: -50, child: Container(width: 300, height: 300, decoration: BoxDecoration(color: const Color(0xFF1E3A8A).withAlpha(140), shape: BoxShape.circle))),
+          Positioned(bottom: 50, right: -100, child: Container(width: 350, height: 350, decoration: BoxDecoration(color: Colors.teal.shade900.withAlpha(120), shape: BoxShape.circle))),
+          Positioned(top: 250, right: 20, child: Container(width: 200, height: 200, decoration: BoxDecoration(color: Colors.purpleAccent.withAlpha(50), shape: BoxShape.circle))),
+          Positioned.fill(child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 75, sigmaY: 75), child: Container(color: Colors.transparent))),
         ],
       ),
     );
@@ -529,16 +525,12 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
     final isSelected = _selectedFines.contains(fine['id']);
 
     final gradientColors = isSelected
-        ? [const Color(0xFF1A2980).withAlpha(60), const Color(0xFF1A2980).withAlpha(20)]
-        : isPending
-        ? [Colors.white.withAlpha(160), Colors.white.withAlpha(80)]
-        : [Colors.cyanAccent.withAlpha(40), Colors.blueAccent.withAlpha(20)];
+        ? [const Color(0xFF1A2980).withAlpha(45), const Color(0xFF1A2980).withAlpha(15)]
+        : [Colors.white.withAlpha(20), Colors.white.withAlpha(6)];
 
     final borderColor = isSelected
-        ? const Color(0xFF1A2980).withAlpha(180)
-        : isPending
-        ? Colors.white.withAlpha(255)
-        : Colors.cyanAccent.withAlpha(100);
+        ? const Color(0xFF1A2980).withAlpha(150)
+        : Colors.white.withAlpha(40);
 
     return GestureDetector(
       onTap: isPending ? () => _toggleSelection(fine['id']) : null,
@@ -548,13 +540,13 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
         child: ClipRRect(
           borderRadius: BorderRadius.circular(24),
           child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 40, sigmaY: 40),
+            filter: ImageFilter.blur(sigmaX: 55, sigmaY: 55),
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(colors: gradientColors, begin: Alignment.topLeft, end: Alignment.bottomRight),
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: borderColor, width: isSelected ? 2.0 : 1.5),
-                boxShadow: [if (isPending) BoxShadow(color: Colors.black.withAlpha(15), blurRadius: 25, offset: const Offset(0, 10))],
+                border: Border.all(color: borderColor, width: isSelected ? 2.0 : 1.0),
+                boxShadow: [BoxShadow(color: Colors.black.withAlpha(25), blurRadius: 25, offset: const Offset(0, 8))],
               ),
               padding: const EdgeInsets.all(20.0),
               child: Column(
@@ -566,36 +558,36 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                       Row(
                         children: [
                           if (isPending) ...[
-                            Icon(isSelected ? Icons.check_circle : Icons.radio_button_unchecked, color: isSelected ? const Color(0xFF1A2980) : Colors.black38, size: 22),
+                            Icon(isSelected ? Icons.check_circle : Icons.radio_button_unchecked, color: isSelected ? Colors.white : Colors.white60, size: 22),
                             const SizedBox(width: 10),
                           ],
-                          Text(_formatId(fine['id']), style: TextStyle(fontWeight: FontWeight.w900, color: isPending ? const Color(0xFF1A2980) : Colors.blue.shade900, fontSize: 16, letterSpacing: 1.0)),
+                          Text(_formatId(fine['id']), style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 16, letterSpacing: 1.0)),
                         ],
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(color: isPending ? Colors.red.withAlpha(30) : Colors.green.withAlpha(30), borderRadius: BorderRadius.circular(12), border: Border.all(color: isPending ? Colors.red.withAlpha(100) : Colors.green.withAlpha(100))),
-                        child: Text(fine['status'], style: TextStyle(color: isPending ? Colors.red.shade900 : Colors.green.shade900, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 0.5)),
+                        decoration: BoxDecoration(color: isPending ? Colors.red.withAlpha(30) : Colors.green.withAlpha(30), borderRadius: BorderRadius.circular(12), border: Border.all(color: isPending ? Colors.red.withAlpha(80) : Colors.green.withAlpha(80))),
+                        child: Text(fine['status'], style: TextStyle(color: isPending ? Colors.red.shade300 : Colors.green.shade300, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 0.5)),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _buildIconTextRow(Icons.calendar_month_rounded, _formatDate(fine['date']), isPending),
+                  _buildIconTextRow(Icons.calendar_month_rounded, _formatDate(fine['date'])),
                   const SizedBox(height: 8),
-                  _buildIconTextRow(Icons.location_on_rounded, fine['location'], isPending),
+                  _buildIconTextRow(Icons.location_on_rounded, fine['location']),
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16.0),
-                    child: Container(height: 1, color: isPending ? Colors.black.withAlpha(20) : Colors.blue.withAlpha(30)),
+                    child: Container(height: 1, color: Colors.white.withAlpha(40)),
                   ),
-                  Text('OFFENSES', style: TextStyle(fontSize: 10, color: isPending ? Colors.black54 : Colors.blue.shade800, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
+                  const Text('OFFENSES', style: TextStyle(fontSize: 10, color: Colors.white60, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
                   const SizedBox(height: 8),
                   ...List.generate(fine['offenses'].length, (index) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4.0),
+                    padding: const EdgeInsets.only(bottom: 6.0),
                     child: Row(
                       children: [
-                        Icon(Icons.warning_amber_rounded, size: 14, color: isPending ? Colors.orange : Colors.amber.shade700),
+                        const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.orangeAccent),
                         const SizedBox(width: 8),
-                        Text(fine['offenses'][index], style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.black87, fontSize: 13)),
+                        Text(fine['offenses'][index], style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white70, fontSize: 13)),
                       ],
                     ),
                   )),
@@ -607,20 +599,20 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('TOTAL AMOUNT', style: TextStyle(fontSize: 10, color: isPending ? Colors.black54 : Colors.blue.shade800, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
+                          const Text('TOTAL AMOUNT', style: TextStyle(fontSize: 10, color: Colors.white60, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
                           const SizedBox(height: 2),
-                          Text('Rs. ${fine['amount'].toStringAsFixed(2)}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: isPending ? Colors.redAccent : Colors.teal.shade800)),
+                          Text('Rs. ${fine['amount'].toStringAsFixed(2)}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: isPending ? Colors.redAccent : Colors.teal.shade300)),
                         ],
                       ),
                       if (isPending && !isSelected)
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white.withAlpha(150),
-                            foregroundColor: const Color(0xFF1A2980),
+                            backgroundColor: Colors.white.withAlpha(25),
+                            foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                             elevation: 0,
-                            side: BorderSide(color: const Color(0xFF1A2980).withAlpha(40), width: 1.5),
+                            side: BorderSide(color: Colors.white.withAlpha(60), width: 1.0),
                           ),
                           onPressed: () {
                             HapticFeedback.lightImpact();
@@ -639,16 +631,16 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildIconTextRow(IconData icon, String text, bool isPending) {
+  Widget _buildIconTextRow(IconData icon, String text) {
     return Row(
       children: [
         Container(
           padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(color: Colors.white.withAlpha(isPending ? 150 : 80), shape: BoxShape.circle),
-          child: Icon(icon, size: 14, color: isPending ? const Color(0xFF1A2980) : Colors.blue.shade800),
+          decoration: BoxDecoration(color: Colors.white.withAlpha(15), shape: BoxShape.circle),
+          child: Icon(icon, size: 14, color: Colors.white70),
         ),
         const SizedBox(width: 10),
-        Text(text, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w600, fontSize: 13)),
+        Text(text, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13)),
       ],
     );
   }
@@ -668,7 +660,7 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
           height: 65,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(35),
-            boxShadow: [BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 20, offset: const Offset(0, 10))],
+            boxShadow: [BoxShadow(color: Colors.black.withAlpha(30), blurRadius: 20, offset: const Offset(0, 10))],
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(35),
@@ -676,9 +668,9 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
               filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1A2980).withAlpha(180),
+                  color: const Color(0xFF1A2980).withAlpha(150),
                   borderRadius: BorderRadius.circular(35),
-                  border: Border.all(color: Colors.white.withAlpha(60), width: 1.5),
+                  border: Border.all(color: Colors.white.withAlpha(60), width: 1.0),
                 ),
                 padding: const EdgeInsets.symmetric(horizontal: 24),
                 child: Row(
@@ -688,15 +680,15 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text('${_selectedFines.length} Selected', style: const TextStyle(color: Colors.white70, fontSize: 11, fontWeight: FontWeight.w600)),
+                        Text('${_selectedFines.length} Selected', style: const TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w600)),
                         Text('Rs. ${total.toStringAsFixed(2)}', style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
                       ],
                     ),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white.withAlpha(220),
-                        foregroundColor: const Color(0xFF1A2980),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        backgroundColor: Colors.white.withAlpha(40),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.white.withAlpha(60))),
                         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
                         elevation: 0,
                         minimumSize: const Size(0, 36),
@@ -721,10 +713,11 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
         _buildGlassBackground(),
         Scaffold(
           backgroundColor: Colors.transparent,
+          extendBodyBehindAppBar: true,
           appBar: AppBar(
             automaticallyImplyLeading: false,
-            backgroundColor: const Color(0xFF1A2980).withAlpha(180),
-            flexibleSpace: ClipRect(child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20), child: Container(color: Colors.transparent))),
+            backgroundColor: const Color(0xFF0B0F19).withAlpha(120),
+            flexibleSpace: ClipRect(child: BackdropFilter(filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15), child: Container(color: Colors.transparent))),
             title: const Text('Traffic Fines', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             bottom: TabBar(
               controller: _tabController,
@@ -746,7 +739,7 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                 const SizedBox(height: 16),
                 Text(_errorMessage, style: const TextStyle(color: Colors.white, fontSize: 16)),
                 const SizedBox(height: 16),
-                ElevatedButton(onPressed: _fetchFines, child: const Text('Retry'))
+                ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.white.withAlpha(30)), onPressed: _fetchFines, child: const Text('Retry', style: TextStyle(color: Colors.white)))
               ],
             ),
           )
@@ -756,17 +749,17 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                 controller: _tabController,
                 children: [
                   _pendingFines.isEmpty
-                      ? const Center(child: Text("No pending fines available.", style: TextStyle(color: Colors.black87)))
+                      ? const Center(child: Text("No pending fines available.", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w500)))
                       : ListView.builder(
-                    padding: const EdgeInsets.only(top: 20, left: 16, right: 16, bottom: 100),
+                    padding: const EdgeInsets.only(top: kToolbarHeight + kTextTabBarHeight + 40, left: 16, right: 16, bottom: 100),
                     itemCount: _pendingFines.length,
                     physics: const BouncingScrollPhysics(),
                     itemBuilder: (context, index) => _buildFineCard(_pendingFines[index], true),
                   ),
                   _paidFines.isEmpty
-                      ? const Center(child: Text("No paid fines history.", style: TextStyle(color: Colors.black87)))
+                      ? const Center(child: Text("No paid fines history.", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w500)))
                       : ListView.builder(
-                    padding: const EdgeInsets.only(top: 20, left: 16, right: 16, bottom: 100),
+                    padding: const EdgeInsets.only(top: kToolbarHeight + kTextTabBarHeight + 40, left: 16, right: 16, bottom: 100),
                     itemCount: _paidFines.length,
                     physics: const BouncingScrollPhysics(),
                     itemBuilder: (context, index) => _buildFineCard(_paidFines[index], false),
