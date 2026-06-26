@@ -1,5 +1,6 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../utils/device_info.dart';
@@ -30,6 +31,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String _verificationId = '';
   String? _registeredPhone;
+  bool _isDeviceVerification = false;
 
   OverlayEntry? _overlayEntry;
 
@@ -58,7 +60,6 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  // Error Messages පෙන්නන්න විතරක් මේක පාවිච්චි කරනවා (උඩින් එන එක)
   void _showToast(String message, {bool isError = false}) {
     _overlayEntry?.remove();
     _overlayEntry = null;
@@ -127,12 +128,11 @@ class _LoginScreenState extends State<LoginScreen> {
     });
   }
 
-  // Success Messages වෙනුවෙන් හදපු අලුත් Global Overlay එක (යටින් එන එක)
   void _showGlobalSuccessToast(OverlayState overlay, String message) {
     late OverlayEntry entry;
     entry = OverlayEntry(
       builder: (context) => Positioned(
-        bottom: 120.0, // Bottom Bar එකට වඩා ගොඩක් උඩින්
+        bottom: 120.0,
         left: 16,
         right: 16,
         child: Material(
@@ -184,7 +184,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     overlay.insert(entry);
 
-    // හරියටම තත්පර 1යි පෙන්වන්නේ
     Future.delayed(const Duration(seconds: 1), () {
       if (entry.mounted) {
         entry.remove();
@@ -216,13 +215,11 @@ class _LoginScreenState extends State<LoginScreen> {
       if (result['success'] == true && mounted) {
         final overlay = Navigator.of(context, rootNavigator: true).overlay;
 
-        // Delay නැතුව කෙලින්ම Home Screen එකට යනවා
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
 
-        // Home Screen එකට ගියාට පස්සේ Success Toast එක දානවා (තත්පර 1ක් පෙන්වයි)
         if (overlay != null) {
           _showGlobalSuccessToast(overlay, 'Login Successful!');
         }
@@ -245,6 +242,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _sendOTP(String phone, {required bool isDeviceVerification}) async {
+    _isDeviceVerification = isDeviceVerification;
     await FirebaseAuth.instance.verifyPhoneNumber(
       phoneNumber: phone,
       verificationCompleted: (PhoneAuthCredential credential) async {
@@ -264,7 +262,7 @@ class _LoginScreenState extends State<LoginScreen> {
           _verificationId = verificationId;
           _isLoading = false;
         });
-        _showOTPDialog(isDeviceVerification: isDeviceVerification);
+        _showOTPDialog(phoneNumber: phone);
       },
       codeAutoRetrievalTimeout: (String verificationId) {
         _verificationId = verificationId;
@@ -272,7 +270,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  Future<void> _verifyOTP({required bool isDeviceVerification}) async {
+  Future<void> _verifyOTP() async {
     FocusScope.of(context).unfocus();
 
     if (_otpController.text.trim().isEmpty) {
@@ -291,7 +289,7 @@ class _LoginScreenState extends State<LoginScreen> {
         Navigator.pop(context);
       }
 
-      if (isDeviceVerification) {
+      if (_isDeviceVerification) {
         await _verifyNewDeviceBackend();
       } else {
         setState(() => _isLoading = false);
@@ -336,22 +334,24 @@ class _LoginScreenState extends State<LoginScreen> {
     FocusScope.of(context).unfocus();
 
     final nic = _forgotNicController.text.trim();
-    final phone = _forgotPhoneController.text.trim();
+    final phoneDigits = _forgotPhoneController.text.trim();
 
     if (nic.isEmpty) {
       _showToast('NIC Number is required', isError: true);
       return;
     }
-    if (phone.isEmpty) {
-      _showToast('Phone Number is required', isError: true);
+    if (phoneDigits.isEmpty || phoneDigits.length != 9) {
+      _showToast('Please enter exactly 9 digits for the phone number.', isError: true);
       return;
     }
+    final phone = '+94$phoneDigits';
 
     setState(() => _isLoading = true);
     try {
       final isValid = await AuthService.forgotPasswordCheck(nic, phone);
       if (isValid && mounted) {
         Navigator.pop(context);
+        _isDeviceVerification = false;
         await _sendOTP(phone, isDeviceVerification: false);
       }
     } catch (e) {
@@ -371,8 +371,9 @@ class _LoginScreenState extends State<LoginScreen> {
       _showToast('New Password is required', isError: true);
       return;
     }
-    if (newPassword.length < 8) {
-      _showToast('Password must be at least 8 characters', isError: true);
+    final passwordRegex = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$');
+    if (!passwordRegex.hasMatch(newPassword)) {
+      _showToast('Password must be at least 8 characters, contain uppercase, lowercase, number, and special character.', isError: true);
       return;
     }
 
@@ -380,7 +381,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final success = await AuthService.resetPassword(
         _forgotNicController.text.trim(),
-        _forgotPhoneController.text.trim(),
+        '+94${_forgotPhoneController.text.trim()}',
         newPassword,
       );
 
@@ -406,6 +407,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showForgotPasswordInitialDialog() {
+    _forgotPhoneController.clear();
     showDialog(
       context: context,
       barrierColor: Colors.black.withAlpha(200),
@@ -444,18 +446,50 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  TextField(
-                    controller: _forgotPhoneController,
-                    keyboardType: TextInputType.phone,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Registered Phone (+94...)',
-                      labelStyle: const TextStyle(color: Colors.white54),
-                      filled: true,
-                      fillColor: Colors.white.withAlpha(20),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.cyanAccent)),
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withAlpha(20),
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(12),
+                            bottomLeft: Radius.circular(12),
+                          ),
+                          border: Border.all(color: Colors.white.withAlpha(40)),
+                        ),
+                        child: const Text('+94', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+                      ),
+                      Expanded(
+                        child: TextField(
+                          controller: _forgotPhoneController,
+                          keyboardType: TextInputType.phone,
+                          maxLength: 9,
+                          style: const TextStyle(color: Colors.white),
+                          decoration: InputDecoration(
+                            labelText: 'Phone Number (9 digits)',
+                            labelStyle: const TextStyle(color: Colors.white54),
+                            counterText: '',
+                            filled: true,
+                            fillColor: Colors.white.withAlpha(20),
+                            enabledBorder: OutlineInputBorder(
+                              borderSide: BorderSide.none,
+                              borderRadius: const BorderRadius.only(
+                                topRight: Radius.circular(12),
+                                bottomRight: Radius.circular(12),
+                              ),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderSide: const BorderSide(color: Colors.cyanAccent),
+                              borderRadius: const BorderRadius.only(
+                                topRight: Radius.circular(12),
+                                bottomRight: Radius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 24),
                   Row(
@@ -499,7 +533,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _showOTPDialog({required bool isDeviceVerification}) {
+  void _showOTPDialog({required String phoneNumber}) {
     _otpController.clear();
     showDialog(
       context: context,
@@ -521,15 +555,15 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(isDeviceVerification ? Icons.phonelink_lock : Icons.message, color: Colors.white, size: 40),
+                  Icon(_isDeviceVerification ? Icons.phonelink_lock : Icons.message, color: Colors.white, size: 40),
                   const SizedBox(height: 15),
-                  Text(isDeviceVerification ? 'Device Verification' : 'Enter OTP',
+                  Text(_isDeviceVerification ? 'Device Verification' : 'Enter OTP',
                       style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 15),
                   Text(
-                    isDeviceVerification
-                        ? 'A new device was detected. Enter the OTP sent to your phone.'
-                        : 'Enter the OTP sent to your mobile number to reset your password.',
+                    _isDeviceVerification
+                        ? 'A new device was detected. Enter the OTP sent to $phoneNumber.'
+                        : 'Enter the OTP sent to $phoneNumber to reset your password.',
                     textAlign: TextAlign.center,
                     style: const TextStyle(color: Colors.white70, fontSize: 14),
                   ),
@@ -577,7 +611,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               side: BorderSide(color: Colors.white.withAlpha(150), width: 1.5),
                             ),
                           ),
-                          onPressed: () => _verifyOTP(isDeviceVerification: isDeviceVerification),
+                          onPressed: _verifyOTP,
                           child: const Text('Verify', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ),
@@ -593,6 +627,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _showResetPasswordDialog() {
+    _newPasswordController.clear();
     showDialog(
       context: context,
       barrierDismissible: false,

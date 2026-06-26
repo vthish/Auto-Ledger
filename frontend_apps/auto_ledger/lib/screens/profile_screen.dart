@@ -178,8 +178,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _showGlassToast('Please enter a new password.', isError: true);
       return;
     }
-    if (newPw.length < 8) {
-      _showGlassToast('New password must be at least 8 characters long.', isError: true);
+    final passwordRegex = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$');
+    if (!passwordRegex.hasMatch(newPw)) {
+      _showGlassToast('Password must be at least 8 characters, contain uppercase, lowercase, number, and special character.', isError: true);
       return;
     }
     if (newPw == oldPw) {
@@ -202,7 +203,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      await ApiService.dio.post('/auth/change-password', data: {
+      await ApiService.dio.post('/auth/user/change-password', data: {
         'oldPassword': oldPw,
         'newPassword': newPw,
       });
@@ -716,7 +717,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Row(
             children: [
               Icon(Icons.fingerprint, color: Colors.white, size: 26),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Text('Biometric Login', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white)),
             ],
           ),

@@ -19,10 +19,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _nameController = TextEditingController();
   final _mobileController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   final _otpController = TextEditingController();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
   String _verificationId = '';
   Map<String, dynamic>? _registeredData;
 
@@ -35,6 +37,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _nameController.dispose();
     _mobileController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     _otpController.dispose();
     super.dispose();
   }
@@ -173,24 +176,39 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _validateInputs() {
     FocusScope.of(context).unfocus();
 
-    if (_nicController.text.trim().isEmpty) {
+    final nic = _nicController.text.trim();
+    final name = _nameController.text.trim();
+    final mobile = _mobileController.text.trim();
+    final password = _passwordController.text.trim();
+    final confirmPassword = _confirmPasswordController.text.trim();
+
+    if (nic.isEmpty) {
       _showToast('NIC Number is required', isError: true);
       return false;
     }
-    if (_nameController.text.trim().isEmpty) {
+    if (name.isEmpty) {
       _showToast('Full Name is required', isError: true);
       return false;
     }
-    if (_mobileController.text.trim().isEmpty) {
-      _showToast('Mobile Number is required', isError: true);
+    if (mobile.isEmpty || mobile.length != 9) {
+      _showToast('Please enter exactly 9 digits for the phone number.', isError: true);
       return false;
     }
-    if (_passwordController.text.trim().isEmpty) {
+    if (password.isEmpty) {
       _showToast('Password is required', isError: true);
       return false;
     }
-    if (_passwordController.text.trim().length < 8) {
-      _showToast('Password must be at least 8 characters long', isError: true);
+    final passwordRegex = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$');
+    if (!passwordRegex.hasMatch(password)) {
+      _showToast('Password must be at least 8 characters, contain uppercase, lowercase, number, and special character.', isError: true);
+      return false;
+    }
+    if (confirmPassword.isEmpty) {
+      _showToast('Please confirm your password.', isError: true);
+      return false;
+    }
+    if (password != confirmPassword) {
+      _showToast('Passwords do not match.', isError: true);
       return false;
     }
     return true;
@@ -203,7 +221,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       final deviceId = await DeviceInfoUtil.getDeviceId();
       final nic = _nicController.text.trim();
-      final phone = _mobileController.text.trim();
+      final phone = '+94${_mobileController.text.trim()}';
 
       _registeredData = {
         "nicNo": nic,
@@ -460,10 +478,90 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     const SizedBox(height: 32),
                     _buildTextField(controller: _nicController, labelText: 'NIC Number', icon: Icons.badge),
                     _buildTextField(controller: _nameController, labelText: 'Full Name', icon: Icons.person),
-                    _buildTextField(controller: _mobileController, labelText: 'Mobile Number (+94...)', icon: Icons.phone, keyboardType: TextInputType.phone),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 18),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withAlpha(20),
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(16),
+                                bottomLeft: Radius.circular(16),
+                              ),
+                              border: Border.all(color: Colors.white.withAlpha(40)),
+                            ),
+                            child: const Text('+94', style: TextStyle(color: Colors.white70, fontWeight: FontWeight.bold)),
+                          ),
+                          Expanded(
+                            child: TextField(
+                              controller: _mobileController,
+                              keyboardType: TextInputType.phone,
+                              maxLength: 9,
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                              decoration: InputDecoration(
+                                labelText: 'Phone Number (9 digits)',
+                                labelStyle: const TextStyle(color: Colors.white70),
+                                counterText: '',
+                                filled: true,
+                                fillColor: Colors.white.withAlpha(20),
+                                enabledBorder: OutlineInputBorder(
+                                  borderSide: BorderSide(color: Colors.white.withAlpha(40)),
+                                  borderRadius: const BorderRadius.only(
+                                    topRight: Radius.circular(16),
+                                    bottomRight: Radius.circular(16),
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderSide: const BorderSide(color: Colors.cyanAccent, width: 1.5),
+                                  borderRadius: const BorderRadius.only(
+                                    topRight: Radius.circular(16),
+                                    bottomRight: Radius.circular(16),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                     _buildTextField(controller: _passwordController, labelText: 'Password', icon: Icons.lock, isPassword: true),
-
-                    const SizedBox(height: 16),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: TextField(
+                        controller: _confirmPasswordController,
+                        obscureText: _obscureConfirmPassword,
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+                        decoration: InputDecoration(
+                          labelText: 'Confirm Password',
+                          labelStyle: const TextStyle(color: Colors.white70),
+                          prefixIcon: const Icon(Icons.lock_outline, color: Colors.white70),
+                          filled: true,
+                          fillColor: Colors.white.withAlpha(20),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                              color: Colors.white70,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _obscureConfirmPassword = !_obscureConfirmPassword;
+                              });
+                            },
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderSide: BorderSide(color: Colors.white.withAlpha(40)),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderSide: const BorderSide(color: Colors.cyanAccent, width: 1.5),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     if (_isLoading)
                       const CircularProgressIndicator(color: Colors.cyanAccent)
                     else
