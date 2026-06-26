@@ -62,14 +62,23 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
 
       for (var f in finesData) {
         double totalAmount = 0.0;
-        List<String> offenseNames = [];
+        int totalPoints = 0;
+        List<Map<String, dynamic>> offenseDetails = [];
 
         if (f['offenses'] != null) {
           for (var o in f['offenses']) {
             final category = o['offenceCategory'];
             if (category != null) {
-              totalAmount += (category['amount'] ?? 0).toDouble();
-              offenseNames.add(category['name'].toString());
+              final amount = (category['amount'] as num?)?.toDouble() ?? 0.0;
+              final points = (category['points_Value'] as num?)?.toInt() ?? 0;
+              totalAmount += amount;
+              totalPoints += points;
+              offenseDetails.add({
+                'name': category['name'].toString(),
+                'code': category['code'] ?? '',
+                'points': points,
+                'amount': amount,
+              });
             }
           }
         }
@@ -83,11 +92,13 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
           'id': f['fine_Id'],
           'date': f['issue_At'],
           'amount': totalAmount,
-          'offenses': offenseNames.isNotEmpty ? offenseNames : ['Unknown Offense'],
+          'points': totalPoints,
+          'offenses': offenseDetails.isNotEmpty ? offenseDetails : [{'name': 'Unknown Offense', 'code': '', 'points': 0, 'amount': 0}],
           'status': f['status'],
           'officer': officerName,
-          'location': 'Not Specified',
+          'comment': f['comment'] ?? '',
           'dueDate': f['due_Date'],
+          'payment': f['payment'],
         };
 
         if (f['status'] == 'PAID') {
@@ -269,6 +280,15 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
     }
   }
 
+  String _formatDateTime(String isoString) {
+    try {
+      final date = DateTime.parse(isoString);
+      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    } catch (_) {
+      return '---';
+    }
+  }
+
   String _formatId(String uuid) {
     return uuid.length >= 8 ? '#${uuid.substring(0, 8).toUpperCase()}' : uuid;
   }
@@ -374,6 +394,23 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                                   ),
                                 ],
                               ),
+                              if (finesToPay.length == 1 && finesToPay.first['offenses'] != null) ...[
+                                const SizedBox(height: 12),
+                                ...List.generate(finesToPay.first['offenses'].length, (index) {
+                                  final offense = finesToPay.first['offenses'][index];
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(vertical: 2),
+                                    child: Row(
+                                      children: [
+                                        Text(offense['code'] ?? '', style: TextStyle(color: Colors.white60, fontSize: 11, fontWeight: FontWeight.w700)),
+                                        const SizedBox(width: 8),
+                                        Expanded(child: Text(offense['name'], style: const TextStyle(color: Colors.white70, fontSize: 12))),
+                                        Text('+${offense['points']} pts', style: TextStyle(color: Colors.orangeAccent, fontSize: 11, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
 
                               Padding(
                                 padding: const EdgeInsets.symmetric(vertical: 16),
@@ -523,6 +560,7 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
 
   Widget _buildFineCard(Map<String, dynamic> fine, bool isPending) {
     final isSelected = _selectedFines.contains(fine['id']);
+    final isOverdue = fine['dueDate'] != null && DateTime.parse(fine['dueDate']).isBefore(DateTime.now());
 
     final gradientColors = isSelected
         ? [const Color(0xFF1A2980).withAlpha(45), const Color(0xFF1A2980).withAlpha(15)]
@@ -566,31 +604,185 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(color: isPending ? Colors.red.withAlpha(30) : Colors.green.withAlpha(30), borderRadius: BorderRadius.circular(12), border: Border.all(color: isPending ? Colors.red.withAlpha(80) : Colors.green.withAlpha(80))),
-                        child: Text(fine['status'], style: TextStyle(color: isPending ? Colors.red.shade300 : Colors.green.shade300, fontWeight: FontWeight.bold, fontSize: 10, letterSpacing: 0.5)),
+                        decoration: BoxDecoration(
+                          color: isPending ? Colors.red.withAlpha(30) : Colors.green.withAlpha(30),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                              color: isPending
+                                  ? (isOverdue ? Colors.red.shade400.withAlpha(80) : Colors.red.withAlpha(80))
+                                  : Colors.green.withAlpha(80)
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              fine['status'],
+                              style: TextStyle(
+                                color: isPending
+                                    ? (isOverdue ? Colors.red.shade400 : Colors.red.shade300)
+                                    : Colors.green.shade300,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            if (isOverdue && isPending) ...[
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.warning_rounded,
+                                color: Colors.redAccent,
+                                size: 12,
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 16),
-                  _buildIconTextRow(Icons.calendar_month_rounded, _formatDate(fine['date'])),
+
+                  // Issue Date
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_month_rounded, size: 14, color: Colors.white60),
+                      const SizedBox(width: 8),
+                      Text(_formatDate(fine['date']), style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13)),
+                    ],
+                  ),
                   const SizedBox(height: 8),
-                  _buildIconTextRow(Icons.location_on_rounded, fine['location']),
+
+                  // Due Date
+                  if (fine['dueDate'] != null) ...[
+                    Row(
+                      children: [
+                        Icon(Icons.event_note, size: 14, color: isOverdue ? Colors.red.shade300 : Colors.white60),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Due: ${_formatDate(fine['dueDate'])}',
+                          style: TextStyle(
+                            color: isOverdue ? Colors.red.shade300 : Colors.white60,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+
+                  // Officer
+                  Row(
+                    children: [
+                      Icon(Icons.person_outline_rounded, size: 14, color: Colors.white60),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          fine['officer'],
+                          style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // Comment
+                  if (fine['comment'] != null && fine['comment'].isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.comment_outlined, size: 14, color: Colors.white60),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            fine['comment'],
+                            style: const TextStyle(color: Colors.white54, fontWeight: FontWeight.w500, fontSize: 12, fontStyle: FontStyle.italic),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  // Payment Info (for PAID fines)
+                  if (!isPending && fine['payment'] != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.payment, size: 14, color: Colors.green.shade300),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Paid: ${_formatDateTime(fine['payment']['paidTime'])}',
+                          style: TextStyle(color: Colors.green.shade300, fontSize: 12, fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ],
+
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 16.0),
                     child: Container(height: 1, color: Colors.white.withAlpha(40)),
                   ),
+
+                  // Offenses Header
                   const Text('OFFENSES', style: TextStyle(fontSize: 10, color: Colors.white60, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
                   const SizedBox(height: 8),
-                  ...List.generate(fine['offenses'].length, (index) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6.0),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.orangeAccent),
-                        const SizedBox(width: 8),
-                        Text(fine['offenses'][index], style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white70, fontSize: 13)),
-                      ],
-                    ),
-                  )),
+
+                  // Offenses List
+                  ...List.generate(fine['offenses'].length, (index) {
+                    final offense = fine['offenses'][index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6.0),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, size: 14, color: Colors.orangeAccent),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                if (offense['code'] != null && offense['code'].isNotEmpty) ...[
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blueGrey.shade800.withAlpha(50),
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                    child: Text(
+                                      offense['code'],
+                                      style: TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.blueGrey.shade300,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                Expanded(
+                                  child: Text(
+                                    offense['name'],
+                                    style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.white70, fontSize: 13),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (offense['points'] > 0)
+                            Text(
+                              '+${offense['points']} pts',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.orangeAccent.withAlpha(180),
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  }),
+
                   const SizedBox(height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -601,7 +793,25 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                         children: [
                           const Text('TOTAL AMOUNT', style: TextStyle(fontSize: 10, color: Colors.white60, fontWeight: FontWeight.w900, letterSpacing: 1.0)),
                           const SizedBox(height: 2),
-                          Text('Rs. ${fine['amount'].toStringAsFixed(2)}', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: isPending ? Colors.redAccent : Colors.teal.shade300)),
+                          Text(
+                            'Rs. ${fine['amount'].toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: isPending
+                                  ? (isOverdue ? Colors.red.shade400 : Colors.redAccent)
+                                  : Colors.teal.shade300,
+                            ),
+                          ),
+                          if (fine['points'] > 0)
+                            Text(
+                              '+${fine['points']} points',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.orangeAccent.withAlpha(150),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                         ],
                       ),
                       if (isPending && !isSelected)
@@ -628,20 +838,6 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildIconTextRow(IconData icon, String text) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(6),
-          decoration: BoxDecoration(color: Colors.white.withAlpha(15), shape: BoxShape.circle),
-          child: Icon(icon, size: 14, color: Colors.white70),
-        ),
-        const SizedBox(width: 10),
-        Text(text, style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13)),
-      ],
     );
   }
 
