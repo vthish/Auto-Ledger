@@ -24,10 +24,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final _forgotNicController = TextEditingController();
   final _forgotPhoneController = TextEditingController();
   final _newPasswordController = TextEditingController();
+  final _confirmNewPasswordController = TextEditingController();
 
   bool _isLoading = false;
   bool _isBiometricEnabled = false;
   bool _obscurePassword = true;
+  bool _obscureResetPassword = true;
+  bool _obscureConfirmResetPassword = true;
 
   String _verificationId = '';
   String? _registeredPhone;
@@ -50,6 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _forgotNicController.dispose();
     _forgotPhoneController.dispose();
     _newPasswordController.dispose();
+    _confirmNewPasswordController.dispose();
     super.dispose();
   }
 
@@ -366,6 +370,7 @@ class _LoginScreenState extends State<LoginScreen> {
     FocusScope.of(context).unfocus();
 
     final newPassword = _newPasswordController.text.trim();
+    final confirmPassword = _confirmNewPasswordController.text.trim();
 
     if (newPassword.isEmpty) {
       _showToast('New Password is required', isError: true);
@@ -374,6 +379,14 @@ class _LoginScreenState extends State<LoginScreen> {
     final passwordRegex = RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$');
     if (!passwordRegex.hasMatch(newPassword)) {
       _showToast('Password must be at least 8 characters, contain uppercase, lowercase, number, and special character.', isError: true);
+      return;
+    }
+    if (confirmPassword.isEmpty) {
+      _showToast('Please confirm your new password.', isError: true);
+      return;
+    }
+    if (newPassword != confirmPassword) {
+      _showToast('New password and confirm password do not match.', isError: true);
       return;
     }
 
@@ -396,6 +409,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _forgotNicController.clear();
         _forgotPhoneController.clear();
         _newPasswordController.clear();
+        _confirmNewPasswordController.clear();
       }
     } catch (e) {
       if (mounted) {
@@ -628,65 +642,106 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _showResetPasswordDialog() {
     _newPasswordController.clear();
+    _confirmNewPasswordController.clear();
     showDialog(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black.withAlpha(200),
       builder: (BuildContext context) {
-        return BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-          child: Dialog(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: Colors.white.withAlpha(25),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withAlpha(50), width: 1.5),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.password, color: Colors.white, size: 40),
-                  const SizedBox(height: 16),
-                  const Text('New Password', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 24),
-                  TextField(
-                    controller: _newPasswordController,
-                    obscureText: true,
-                    style: const TextStyle(color: Colors.white),
-                    decoration: InputDecoration(
-                      labelText: 'Enter New Password',
-                      labelStyle: const TextStyle(color: Colors.white54),
-                      filled: true,
-                      fillColor: Colors.white.withAlpha(20),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.cyanAccent)),
-                    ),
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+              child: Dialog(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(25),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: Colors.white.withAlpha(50), width: 1.5),
                   ),
-                  const SizedBox(height: 24),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white.withAlpha(50),
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: BorderSide(color: Colors.white.withAlpha(150), width: 1.5),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.password, color: Colors.white, size: 40),
+                      const SizedBox(height: 16),
+                      const Text('New Password', style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 24),
+                      TextField(
+                        controller: _newPasswordController,
+                        obscureText: _obscureResetPassword,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: 'New Password',
+                          labelStyle: const TextStyle(color: Colors.white54),
+                          filled: true,
+                          fillColor: Colors.white.withAlpha(20),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.cyanAccent)),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureResetPassword ? Icons.visibility_off : Icons.visibility,
+                              color: Colors.white70,
+                            ),
+                            onPressed: () {
+                              setModalState(() {
+                                _obscureResetPassword = !_obscureResetPassword;
+                              });
+                            },
+                          ),
                         ),
                       ),
-                      onPressed: _handlePasswordReset,
-                      child: const Text('Save Password', style: TextStyle(fontWeight: FontWeight.bold)),
-                    ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: _confirmNewPasswordController,
+                        obscureText: _obscureConfirmResetPassword,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: 'Confirm New Password',
+                          labelStyle: const TextStyle(color: Colors.white54),
+                          filled: true,
+                          fillColor: Colors.white.withAlpha(20),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.cyanAccent)),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscureConfirmResetPassword ? Icons.visibility_off : Icons.visibility,
+                              color: Colors.white70,
+                            ),
+                            onPressed: () {
+                              setModalState(() {
+                                _obscureConfirmResetPassword = !_obscureConfirmResetPassword;
+                              });
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white.withAlpha(50),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(color: Colors.white.withAlpha(150), width: 1.5),
+                            ),
+                          ),
+                          onPressed: _handlePasswordReset,
+                          child: const Text('Save Password', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
