@@ -261,6 +261,7 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
       if (!mounted) return;
 
       if (result['success'] == true) {
+        await SecureStorage.saveNic(nic);
         final overlay = Navigator.of(context, rootNavigator: true).overlay;
         Navigator.pushReplacement(
           context,
