@@ -458,11 +458,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      resizeToAvoidBottomInset: true,
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           const _RegisterBackground(),
           Center(
             child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
               padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 40.0),
               child: GlassContainer(
                 width: double.infinity,
