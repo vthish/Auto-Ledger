@@ -477,13 +477,22 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: padding ?? const EdgeInsets.all(20),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [Colors.white.withAlpha(20), Colors.white.withAlpha(6)],
+              colors: [
+                Colors.white.withAlpha(45),
+                Colors.white.withAlpha(18),
+              ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withAlpha(40), width: 1.0),
-            boxShadow: [BoxShadow(color: Colors.black.withAlpha(15), blurRadius: 20, offset: const Offset(0, 8))],
+            border: Border.all(color: Colors.white.withAlpha(60), width: 1.0),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withAlpha(30),
+                blurRadius: 25,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
           child: child,
         ),
