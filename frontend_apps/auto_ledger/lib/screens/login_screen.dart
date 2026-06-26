@@ -1,11 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
 import '../services/biometric_service.dart';
 import '../utils/device_info.dart';
 import '../utils/settings_util.dart';
+import '../utils/secure_storage.dart';
 import '../widgets/glass_container.dart';
 import 'home_screen.dart';
 import 'register_screen.dart';
@@ -45,7 +45,6 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    print('🚀 [LoginScreen] initState called.');
     WidgetsBinding.instance.addObserver(this);
     _checkBiometricStatus();
     _checkBiometricAvailability();
@@ -53,7 +52,6 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
 
   @override
   void dispose() {
-    print('♻️ [LoginScreen] dispose called.');
     WidgetsBinding.instance.removeObserver(this);
     _overlayEntry?.remove();
     _nicController.dispose();
@@ -69,7 +67,6 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      print('🔄 [LoginScreen] App Resumed. Re-checking biometric status.');
       _checkBiometricStatus();
       _checkBiometricAvailability();
     }
@@ -77,7 +74,6 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
 
   Future<void> _checkBiometricStatus() async {
     final isEnabled = await SettingsUtil.isBiometricEnabled();
-    print('🔐 [LoginScreen] Biometric Enabled in Settings: $isEnabled');
     if (mounted) {
       setState(() {
         _isBiometricEnabled = isEnabled;
@@ -86,9 +82,7 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _checkBiometricAvailability() async {
-    print('📱 [LoginScreen] Checking biometric hardware availability...');
     final available = await _biometricService.checkBiometricsAvailable();
-    print('📱 [LoginScreen] Biometric Hardware Available: $available');
     if (mounted) {
       setState(() {
         _isBiometricAvailable = available;
@@ -164,7 +158,7 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
     });
   }
 
-  void _showGlobalSuccessToast(OverlayState overlay, String message) {
+  void _showGlassySuccessToast(OverlayState overlay, String message) {
     late OverlayEntry entry;
     entry = OverlayEntry(
       builder: (context) => Positioned(
@@ -187,27 +181,32 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
               );
             },
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(20),
               child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                filter: ImageFilter.blur(sigmaX: 50, sigmaY: 50),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade800.withAlpha(230),
-                    borderRadius: BorderRadius.circular(16),
+                    color: Colors.green.shade600.withAlpha(40),
+                    borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                      color: Colors.white.withAlpha(70),
+                      color: Colors.white.withAlpha(100),
                       width: 1.0,
                     ),
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 10, spreadRadius: 1)
+                      BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 20, offset: const Offset(0, 10))
                     ],
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.check_circle_outline, color: Colors.white),
+                      const Icon(Icons.check_circle_outline_rounded, color: Colors.white, size: 28),
                       const SizedBox(width: 12),
-                      Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+                      Expanded(
+                        child: Text(
+                          message,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -228,33 +227,28 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _handleBiometricLogin() async {
-    print('👆 [LoginScreen] Biometric Icon Clicked!');
+    if (!mounted) return;
 
     final isEnabled = await SettingsUtil.isBiometricEnabled();
-    print('🔐 [LoginScreen] (Click) Biometric enabled: $isEnabled');
     if (!isEnabled) {
       _showToast('Biometric login is not enabled in settings.', isError: true);
       return;
     }
 
-    print('📱 [LoginScreen] (Click) Checking hardware again...');
-    final isAvailable = await _biometricService.checkBiometricsAvailable();
-    print('📱 [LoginScreen] (Click) Hardware available: $isAvailable');
-    if (!isAvailable) {
+    if (!_isBiometricAvailable) {
       _showToast('Biometric hardware not available.', isError: true);
       return;
     }
 
-    final nic = _nicController.text.trim();
-    print('📝 [LoginScreen] (Click) NIC entered: $nic');
+    String? savedNic = await SecureStorage.getNic();
+    String nic = savedNic ?? _nicController.text.trim();
+
     if (nic.isEmpty) {
-      _showToast('Please enter your NIC first.', isError: true);
+      _showToast('Please enter your NIC first to save for biometric login.', isError: true);
       return;
     }
 
-    print('🔐 [LoginScreen] (Click) Calling BiometricService.authenticate()...');
     final authenticated = await _biometricService.authenticate();
-    print('🔐 [LoginScreen] (Click) Authentication result: $authenticated');
     if (!authenticated) {
       _showToast('Authentication failed.', isError: true);
       return;
@@ -263,30 +257,31 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
     setState(() => _isLoading = true);
     try {
       final deviceId = await DeviceInfoUtil.getDeviceId();
-      print('📱 [LoginScreen] (Click) DeviceID: $deviceId');
       final result = await AuthService.biometricLogin(nic, deviceId);
-      print('📡 [LoginScreen] (Click) Biometric Login API result: $result');
-      if (result['success'] == true && mounted) {
+      if (!mounted) return;
+
+      if (result['success'] == true) {
         final overlay = Navigator.of(context, rootNavigator: true).overlay;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
         if (overlay != null) {
-          _showGlobalSuccessToast(overlay, 'Biometric Login Successful!');
+          _showGlassySuccessToast(overlay, 'Biometric Login Successful!');
         }
       } else {
         _showToast('Biometric login failed. Check NIC.', isError: true);
       }
     } catch (e) {
-      print('❌ [LoginScreen] (Click) Catch Error: $e');
-      _showToast('An error occurred during biometric login.', isError: true);
+      if (mounted) _showToast('An error occurred during biometric login.', isError: true);
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
   Future<void> _handleLogin() async {
+    if (!mounted) return;
+
     FocusScope.of(context).unfocus();
 
     if (_nicController.text.trim().isEmpty) {
@@ -307,26 +302,25 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
         deviceId,
       );
 
-      if (result['success'] == true && mounted) {
-        final overlay = Navigator.of(context, rootNavigator: true).overlay;
+      if (!mounted) return;
 
+      if (result['success'] == true) {
+        await SecureStorage.saveNic(_nicController.text.trim());
+        final overlay = Navigator.of(context, rootNavigator: true).overlay;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
-
         if (overlay != null) {
-          _showGlobalSuccessToast(overlay, 'Login Successful!');
+          _showGlassySuccessToast(overlay, 'Login Successful!');
         }
-      } else if (result['isDeviceMismatch'] == true && mounted) {
+      } else if (result['isDeviceMismatch'] == true) {
         _showToast('New device detected. Verification required.', isError: true);
         _registeredPhone = result['phone'];
         await _sendOTP(_registeredPhone!, isDeviceVerification: true);
       } else {
-        if (mounted) {
-          _showToast('Login Failed. Check credentials.', isError: true);
-          setState(() => _isLoading = false);
-        }
+        _showToast('Login Failed. Check credentials.', isError: true);
+        setState(() => _isLoading = false);
       }
     } catch (e) {
       if (mounted) {
@@ -337,6 +331,8 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _sendOTP(String phone, {required bool isDeviceVerification}) async {
+    if (!mounted) return;
+
     _isDeviceVerification = isDeviceVerification;
     await FirebaseAuth.instance.verifyPhoneNumber(
       phoneNumber: phone,
@@ -353,11 +349,13 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
         }
       },
       codeSent: (String verificationId, int? resendToken) {
-        setState(() {
-          _verificationId = verificationId;
-          _isLoading = false;
-        });
-        _showOTPDialog(phoneNumber: phone);
+        if (mounted) {
+          setState(() {
+            _verificationId = verificationId;
+            _isLoading = false;
+          });
+          _showOTPDialog(phoneNumber: phone);
+        }
       },
       codeAutoRetrievalTimeout: (String verificationId) {
         _verificationId = verificationId;
@@ -366,6 +364,8 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _verifyOTP() async {
+    if (!mounted) return;
+
     FocusScope.of(context).unfocus();
 
     if (_otpController.text.trim().isEmpty) {
@@ -380,9 +380,9 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
         smsCode: _otpController.text.trim(),
       );
       await FirebaseAuth.instance.signInWithCredential(credential);
-      if (mounted) {
-        Navigator.pop(context);
-      }
+      if (!mounted) return;
+
+      Navigator.pop(context);
 
       if (_isDeviceVerification) {
         await _verifyNewDeviceBackend();
@@ -399,22 +399,25 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _verifyNewDeviceBackend() async {
+    if (!mounted) return;
+
     try {
       final deviceId = await DeviceInfoUtil.getDeviceId();
       final isVerified = await AuthService.verifyNewDevice(
           _nicController.text.trim(),
           deviceId
       );
-      if (isVerified && mounted) {
-        final overlay = Navigator.of(context, rootNavigator: true).overlay;
+      if (!mounted) return;
 
+      if (isVerified) {
+        await SecureStorage.saveNic(_nicController.text.trim());
+        final overlay = Navigator.of(context, rootNavigator: true).overlay;
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
-
         if (overlay != null) {
-          _showGlobalSuccessToast(overlay, 'Device verified successfully!');
+          _showGlassySuccessToast(overlay, 'Device verified successfully!');
         }
       }
     } catch (e) {
@@ -426,6 +429,8 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _handleForgotPasswordCheck() async {
+    if (!mounted) return;
+
     FocusScope.of(context).unfocus();
 
     final nic = _forgotNicController.text.trim();
@@ -444,7 +449,9 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
     setState(() => _isLoading = true);
     try {
       final isValid = await AuthService.forgotPasswordCheck(nic, phone);
-      if (isValid && mounted) {
+      if (!mounted) return;
+
+      if (isValid) {
         Navigator.pop(context);
         _isDeviceVerification = false;
         await _sendOTP(phone, isDeviceVerification: false);
@@ -458,6 +465,8 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _handlePasswordReset() async {
+    if (!mounted) return;
+
     FocusScope.of(context).unfocus();
 
     final newPassword = _newPasswordController.text.trim();
@@ -489,25 +498,27 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
         newPassword,
       );
 
-      if (success && mounted) {
+      if (!mounted) return;
+
+      if (success) {
         Navigator.pop(context);
 
         final overlay = Navigator.of(context, rootNavigator: true).overlay;
         if (overlay != null) {
-          _showGlobalSuccessToast(overlay, 'Password reset successfully! Please login.');
+          _showGlassySuccessToast(overlay, 'Password reset successfully! Please login.');
         }
 
         _forgotNicController.clear();
         _forgotPhoneController.clear();
         _newPasswordController.clear();
         _confirmNewPasswordController.clear();
+        setState(() => _isLoading = false);
       }
     } catch (e) {
       if (mounted) {
         _showToast('Failed to reset password.', isError: true);
+        setState(() => _isLoading = false);
       }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -840,9 +851,6 @@ class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    print('🖥️ [LoginScreen] Build method called.');
-    print('🔐 [LoginScreen] Build State - isBiometricEnabled: $_isBiometricEnabled, isBiometricAvailable: $_isBiometricAvailable');
-
     return Scaffold(
       body: Stack(
         children: [

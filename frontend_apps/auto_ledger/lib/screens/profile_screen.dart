@@ -165,7 +165,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  // ✅ මෙහිදී POST වෙනුවට PATCH භාවිතා කර ඇත
   Future<void> _changePassword(BuildContext dialogContext, StateSetter setModalState) async {
     final oldPw = _oldPwController.text.trim();
     final newPw = _newPwController.text.trim();
@@ -204,7 +203,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      // ✅ POST → PATCH ලෙස වෙනස් කර ඇත
       await ApiService.dio.patch('/auth/user/change-password', data: {
         'oldPassword': oldPw,
         'newPassword': newPw,
@@ -355,6 +353,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 Navigator.pop(context);
                                 SettingsUtil.setBiometricEnabled(true);
                                 setState(() => _isBiometricEnabled = true);
+                                SecureStorage.saveNic(_nic);
                                 _showGlassToast('Biometrics Enabled Successfully!');
                                 widget.onLogActivity('Enabled Biometric Login', Icons.fingerprint_rounded);
                               },
@@ -541,6 +540,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             HapticFeedback.heavyImpact();
                             widget.onLogActivity('Logged Out', Icons.logout_rounded);
                             await SecureStorage.deleteToken();
+                            await SecureStorage.deleteNic();
                             if (mounted) {
                               Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false);
                             }
@@ -719,7 +719,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const Row(
             children: [
               Icon(Icons.fingerprint, color: Colors.white, size: 26),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Text('Biometric Login', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Colors.white)),
             ],
           ),
@@ -741,6 +741,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               } else {
                 SettingsUtil.setBiometricEnabled(false);
                 setState(() => _isBiometricEnabled = false);
+                SecureStorage.deleteNic();
                 _showGlassToast('Biometric login disabled.', isError: true);
                 widget.onLogActivity('Disabled Biometric Login', Icons.fingerprint_rounded);
               }
