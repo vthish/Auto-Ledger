@@ -244,6 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _showBiometricPasswordDialog() {
     final TextEditingController pwController = TextEditingController();
     bool isObscured = true;
+    bool _isVerifying = false;
 
     showDialog(
       context: context,
@@ -345,19 +346,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     side: BorderSide(color: Colors.white.withAlpha(80), width: 1)
                                 ),
                               ),
-                              onPressed: () {
-                                if (pwController.text.trim().isEmpty) {
+                              onPressed: _isVerifying
+                                  ? null
+                                  : () async {
+                                final enteredPassword = pwController.text.trim();
+                                if (enteredPassword.isEmpty) {
                                   _showGlassToast('Password is required!', isError: true);
                                   return;
                                 }
-                                Navigator.pop(context);
-                                SettingsUtil.setBiometricEnabled(true);
-                                setState(() => _isBiometricEnabled = true);
-                                SecureStorage.saveNic(_nic);
-                                _showGlassToast('Biometrics Enabled Successfully!');
-                                widget.onLogActivity('Enabled Biometric Login', Icons.fingerprint_rounded);
+
+                                setModalState(() => _isVerifying = true);
+
+                                try {
+                                  final tempPassword = enteredPassword + '_verify_temp';
+
+                                  await ApiService.dio.patch('/auth/user/change-password', data: {
+                                    'oldPassword': enteredPassword,
+                                    'newPassword': tempPassword,
+                                  });
+
+                                  await ApiService.dio.patch('/auth/user/change-password', data: {
+                                    'oldPassword': tempPassword,
+                                    'newPassword': enteredPassword,
+                                  });
+
+                                  if (mounted) {
+                                    Navigator.pop(context);
+                                    SettingsUtil.setBiometricEnabled(true);
+                                    setState(() => _isBiometricEnabled = true);
+                                    SecureStorage.saveNic(_nic);
+                                    _showGlassToast('Biometrics Enabled Successfully!');
+                                    widget.onLogActivity('Enabled Biometric Login', Icons.fingerprint_rounded);
+                                  }
+                                } on DioException catch (e) {
+                                  setModalState(() => _isVerifying = false);
+                                  final errorMsg = e.response?.data['message'] ?? 'Invalid password. Please try again.';
+                                  _showGlassToast(errorMsg, isError: true);
+                                } catch (e) {
+                                  setModalState(() => _isVerifying = false);
+                                  _showGlassToast('An error occurred. Please try again.', isError: true);
+                                }
                               },
-                              child: const Text('Enable', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                              child: _isVerifying
+                                  ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  color: Colors.white,
+                                  strokeWidth: 2,
+                                ),
+                              )
+                                  : const Text(
+                                'Enable',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                              ),
                             ),
                           ),
                         ],
@@ -540,7 +585,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             HapticFeedback.heavyImpact();
                             widget.onLogActivity('Logged Out', Icons.logout_rounded);
                             await SecureStorage.deleteToken();
-                            await SecureStorage.deleteNic();
+                            final isBiometricEnabled = await SettingsUtil.isBiometricEnabled();
+                            if (!isBiometricEnabled) {
+                              await SecureStorage.deleteNic();
+                            }
                             if (mounted) {
                               Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginScreen()), (route) => false);
                             }
