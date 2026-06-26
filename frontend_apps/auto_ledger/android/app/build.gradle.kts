@@ -22,7 +22,7 @@ android {
     defaultConfig {
         applicationId = "com.auto_ledger"
         minSdk = 23
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

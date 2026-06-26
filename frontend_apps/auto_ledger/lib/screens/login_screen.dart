@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/auth_service.dart';
+import '../services/biometric_service.dart';
 import '../utils/device_info.dart';
 import '../utils/settings_util.dart';
 import '../widgets/glass_container.dart';
@@ -16,7 +17,7 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with WidgetsBindingObserver {
   final _nicController = TextEditingController();
   final _passwordController = TextEditingController();
   final _otpController = TextEditingController();
@@ -25,6 +26,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _forgotPhoneController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmNewPasswordController = TextEditingController();
+
+  final BiometricService _biometricService = BiometricService();
+  bool _isBiometricAvailable = false;
 
   bool _isLoading = false;
   bool _isBiometricEnabled = false;
@@ -41,11 +45,16 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
+    print('🚀 [LoginScreen] initState called.');
+    WidgetsBinding.instance.addObserver(this);
     _checkBiometricStatus();
+    _checkBiometricAvailability();
   }
 
   @override
   void dispose() {
+    print('♻️ [LoginScreen] dispose called.');
+    WidgetsBinding.instance.removeObserver(this);
     _overlayEntry?.remove();
     _nicController.dispose();
     _passwordController.dispose();
@@ -57,11 +66,34 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      print('🔄 [LoginScreen] App Resumed. Re-checking biometric status.');
+      _checkBiometricStatus();
+      _checkBiometricAvailability();
+    }
+  }
+
   Future<void> _checkBiometricStatus() async {
     final isEnabled = await SettingsUtil.isBiometricEnabled();
-    setState(() {
-      _isBiometricEnabled = isEnabled;
-    });
+    print('🔐 [LoginScreen] Biometric Enabled in Settings: $isEnabled');
+    if (mounted) {
+      setState(() {
+        _isBiometricEnabled = isEnabled;
+      });
+    }
+  }
+
+  Future<void> _checkBiometricAvailability() async {
+    print('📱 [LoginScreen] Checking biometric hardware availability...');
+    final available = await _biometricService.checkBiometricsAvailable();
+    print('📱 [LoginScreen] Biometric Hardware Available: $available');
+    if (mounted) {
+      setState(() {
+        _isBiometricAvailable = available;
+      });
+    }
   }
 
   void _showToast(String message, {bool isError = false}) {
@@ -193,6 +225,65 @@ class _LoginScreenState extends State<LoginScreen> {
         entry.remove();
       }
     });
+  }
+
+  Future<void> _handleBiometricLogin() async {
+    print('👆 [LoginScreen] Biometric Icon Clicked!');
+
+    final isEnabled = await SettingsUtil.isBiometricEnabled();
+    print('🔐 [LoginScreen] (Click) Biometric enabled: $isEnabled');
+    if (!isEnabled) {
+      _showToast('Biometric login is not enabled in settings.', isError: true);
+      return;
+    }
+
+    print('📱 [LoginScreen] (Click) Checking hardware again...');
+    final isAvailable = await _biometricService.checkBiometricsAvailable();
+    print('📱 [LoginScreen] (Click) Hardware available: $isAvailable');
+    if (!isAvailable) {
+      _showToast('Biometric hardware not available.', isError: true);
+      return;
+    }
+
+    final nic = _nicController.text.trim();
+    print('📝 [LoginScreen] (Click) NIC entered: $nic');
+    if (nic.isEmpty) {
+      _showToast('Please enter your NIC first.', isError: true);
+      return;
+    }
+
+    print('🔐 [LoginScreen] (Click) Calling BiometricService.authenticate()...');
+    final authenticated = await _biometricService.authenticate();
+    print('🔐 [LoginScreen] (Click) Authentication result: $authenticated');
+    if (!authenticated) {
+      _showToast('Authentication failed.', isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final deviceId = await DeviceInfoUtil.getDeviceId();
+      print('📱 [LoginScreen] (Click) DeviceID: $deviceId');
+      final result = await AuthService.biometricLogin(nic, deviceId);
+      print('📡 [LoginScreen] (Click) Biometric Login API result: $result');
+      if (result['success'] == true && mounted) {
+        final overlay = Navigator.of(context, rootNavigator: true).overlay;
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+        if (overlay != null) {
+          _showGlobalSuccessToast(overlay, 'Biometric Login Successful!');
+        }
+      } else {
+        _showToast('Biometric login failed. Check NIC.', isError: true);
+      }
+    } catch (e) {
+      print('❌ [LoginScreen] (Click) Catch Error: $e');
+      _showToast('An error occurred during biometric login.', isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _handleLogin() async {
@@ -749,6 +840,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    print('🖥️ [LoginScreen] Build method called.');
+    print('🔐 [LoginScreen] Build State - isBiometricEnabled: $_isBiometricEnabled, isBiometricAvailable: $_isBiometricAvailable');
+
     return Scaffold(
       body: Stack(
         children: [
@@ -860,12 +954,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     const SizedBox(height: 24),
-                    if (_isBiometricEnabled) ...[
+                    if (_isBiometricEnabled && _isBiometricAvailable) ...[
                       IconButton(
                         icon: const Icon(Icons.fingerprint, color: Colors.white, size: 45),
-                        onPressed: () {
-                          _showToast('Biometric Login Coming Soon!');
-                        },
+                        onPressed: _isLoading ? null : _handleBiometricLogin,
                       ),
                       const SizedBox(height: 16),
                     ],

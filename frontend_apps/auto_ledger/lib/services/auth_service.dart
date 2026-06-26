@@ -107,4 +107,30 @@ class AuthService {
       rethrow;
     }
   }
+
+  static Future<Map<String, dynamic>> biometricLogin(String nicNo, String deviceId) async {
+    try {
+      print('🌐 [AuthService] Calling Biometric Login API for NIC: $nicNo');
+      final response = await ApiService.dio.post(
+        '/auth/user/biometric-login',
+        data: {
+          'nicNo': nicNo,
+          'deviceId': deviceId,
+        },
+      );
+      print('📡 [AuthService] Biometric API Status: ${response.statusCode}');
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final token = response.data['accessToken'];
+        await SecureStorage.saveToken(token);
+        print('✅ [AuthService] Biometric Login Success. Token saved.');
+        return {'success': true};
+      }
+      print('⚠️ [AuthService] Biometric Login returned non-success status.');
+      return {'success': false};
+    } on DioException catch (e) {
+      print('❌ [AuthService] Biometric API Error: ${e.message}');
+      print('❌ [AuthService] Response Data: ${e.response?.data}');
+      rethrow;
+    }
+  }
 }
