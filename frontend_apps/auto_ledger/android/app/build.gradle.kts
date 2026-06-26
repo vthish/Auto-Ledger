@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.auto_ledger"
+    namespace = "com.auto_ledger"
     compileSdk = 36
     ndkVersion = "27.0.12077973"
 
@@ -20,7 +20,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.auto_ledger"
+        applicationId = "com.auto_ledger"
         minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

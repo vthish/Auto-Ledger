@@ -1,4 +1,4 @@
-package com.example.auto_ledger
+package com.auto_ledger
 
 import io.flutter.embedding.android.FlutterActivity
 
