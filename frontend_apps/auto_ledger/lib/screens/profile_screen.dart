@@ -165,6 +165,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  // ✅ මෙහිදී POST වෙනුවට PATCH භාවිතා කර ඇත
   Future<void> _changePassword(BuildContext dialogContext, StateSetter setModalState) async {
     final oldPw = _oldPwController.text.trim();
     final newPw = _newPwController.text.trim();
@@ -203,7 +204,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      await ApiService.dio.post('/auth/user/change-password', data: {
+      // ✅ POST → PATCH ලෙස වෙනස් කර ඇත
+      await ApiService.dio.patch('/auth/user/change-password', data: {
         'oldPassword': oldPw,
         'newPassword': newPw,
       });
