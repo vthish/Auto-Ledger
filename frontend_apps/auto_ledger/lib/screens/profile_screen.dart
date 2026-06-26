@@ -905,9 +905,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
 
                   const SizedBox(height: 20),
+
+                  // Biometric Toggle
                   _buildBiometricToggle(),
 
                   const SizedBox(height: 20),
+
+                  // Change Password
                   _buildGlassCard(
                     padding: const EdgeInsets.all(4),
                     child: ListTile(
@@ -924,6 +928,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                   const SizedBox(height: 30),
 
+                  // Logout Button
                   ClipRRect(
                     borderRadius: BorderRadius.circular(20),
                     child: BackdropFilter(

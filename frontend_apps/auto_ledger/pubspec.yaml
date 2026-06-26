@@ -22,6 +22,11 @@ dependencies:
   flutter_dotenv: ^6.0.1
   firebase_auth: ^6.5.2
 
+  # PDF Receipt
+  pdf: ^3.10.4
+  printing: ^5.11.1
+  path_provider: ^2.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

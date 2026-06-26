@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import '../services/api_service.dart';
+import '../services/pdf_service.dart';
 
 class FinesScreen extends StatefulWidget {
   final void Function(String, IconData) onLogActivity;
@@ -31,14 +32,14 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(_handleTabChange);
     _fetchFines();
   }
 
   void _handleTabChange() {
     if (!_tabController.indexIsChanging) {
-      final tabName = _tabController.index == 0 ? 'Pending Fines' : 'Paid Fines';
+      final tabName = _tabController.index == 0 ? 'Pending Fines' : _tabController.index == 1 ? 'Paid Fines' : 'Points History';
       widget.onLogActivity('Viewed $tabName', Icons.tab);
       if (_selectedFines.isNotEmpty) {
         setState(() => _selectedFines.clear());
@@ -226,6 +227,80 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
       Navigator.pop(context);
       _showGlassToast('Payment Failed! Please try again.', isError: true);
     }
+  }
+
+  void _showReceiptDialog(Map<String, dynamic> fine) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withAlpha(160),
+      builder: (BuildContext context) {
+        return BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+          child: Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Colors.white.withAlpha(40), Colors.white.withAlpha(15)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: Colors.white.withAlpha(60), width: 1.0),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 50),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Download Receipt',
+                    style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Fine #${_formatId(fine['id'])}',
+                    style: const TextStyle(color: Colors.white60, fontSize: 14),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Cancel', style: TextStyle(color: Colors.white70)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white.withAlpha(40),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              side: BorderSide(color: Colors.white.withAlpha(60)),
+                            ),
+                          ),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            PdfService.generateAndPrintReceipt(fine);
+                          },
+                          child: const Text('Download', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showGlassToast(String message, {bool isError = false}) {
@@ -830,6 +905,18 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                           },
                           child: const Text('PAY NOW', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 12)),
                         ),
+                      if (!isPending)
+                        TextButton.icon(
+                          onPressed: () => _showReceiptDialog(fine),
+                          icon: const Icon(Icons.picture_as_pdf, color: Colors.white60, size: 16),
+                          label: const Text(
+                            'Receipt',
+                            style: TextStyle(color: Colors.white60, fontSize: 11),
+                          ),
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                          ),
+                        ),
                     ],
                   ),
                 ],
@@ -902,6 +989,126 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
     );
   }
 
+  Widget _buildPointsHistoryTab() {
+    final allFines = [..._pendingFines, ..._paidFines]
+      ..sort((a, b) => DateTime.parse(b['date']).compareTo(DateTime.parse(a['date'])));
+
+    if (allFines.isEmpty) {
+      return const Center(
+        child: Text(
+          'No points history available.',
+          style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w500),
+        ),
+      );
+    }
+
+    int totalPoints = 0;
+    final List<Map<String, dynamic>> history = [];
+
+    for (var fine in allFines) {
+      final points = (fine['points'] as int?) ?? 0;
+      totalPoints += points;
+      history.add({
+        'date': fine['date'],
+        'points': points,
+        'cumulative': totalPoints,
+        'status': fine['status'],
+        'id': fine['id'],
+        'officer': fine['officer'],
+      });
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.only(top: kToolbarHeight + kTextTabBarHeight + 40, left: 16, right: 16, bottom: 100),
+      itemCount: history.length,
+      physics: const BouncingScrollPhysics(),
+      itemBuilder: (context, index) {
+        final item = history[index];
+        final isPending = item['status'] == 'PENDING';
+
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white.withAlpha(isPending ? 15 : 8),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: isPending ? Colors.white.withAlpha(40) : Colors.white.withAlpha(20),
+                    width: 1.0,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 4,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: isPending ? Colors.orangeAccent : Colors.greenAccent,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _formatDate(item['date']),
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                          Text(
+                            '#${_formatId(item['id'])}',
+                            style: const TextStyle(color: Colors.white60, fontSize: 10),
+                          ),
+                          Text(
+                            item['officer'] ?? '',
+                            style: const TextStyle(color: Colors.white54, fontSize: 10),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            item['status'],
+                            style: TextStyle(
+                              color: isPending ? Colors.orangeAccent : Colors.greenAccent,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '+${item['points']}',
+                          style: TextStyle(
+                            color: isPending ? Colors.orangeAccent : Colors.greenAccent,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Total: ${item['cumulative']}',
+                          style: const TextStyle(color: Colors.white60, fontSize: 11),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -921,7 +1128,11 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
               unselectedLabelColor: Colors.white70,
               indicatorColor: Colors.cyanAccent,
               indicatorWeight: 3,
-              tabs: const [Tab(text: 'PENDING'), Tab(text: 'PAID')],
+              tabs: const [
+                Tab(text: 'PENDING'),
+                Tab(text: 'PAID'),
+                Tab(text: 'POINTS'),
+              ],
             ),
           ),
           body: _isLoading
@@ -935,7 +1146,11 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                 const SizedBox(height: 16),
                 Text(_errorMessage, style: const TextStyle(color: Colors.white, fontSize: 16)),
                 const SizedBox(height: 16),
-                ElevatedButton(style: ElevatedButton.styleFrom(backgroundColor: Colors.white.withAlpha(30)), onPressed: _fetchFines, child: const Text('Retry', style: TextStyle(color: Colors.white)))
+                ElevatedButton(
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.white.withAlpha(30)),
+                    onPressed: _fetchFines,
+                    child: const Text('Retry', style: TextStyle(color: Colors.white))
+                )
               ],
             ),
           )
@@ -944,6 +1159,7 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
               TabBarView(
                 controller: _tabController,
                 children: [
+                  // Pending Fines
                   _pendingFines.isEmpty
                       ? const Center(child: Text("No pending fines available.", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w500)))
                       : ListView.builder(
@@ -952,6 +1168,7 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                     physics: const BouncingScrollPhysics(),
                     itemBuilder: (context, index) => _buildFineCard(_pendingFines[index], true),
                   ),
+                  // Paid Fines
                   _paidFines.isEmpty
                       ? const Center(child: Text("No paid fines history.", style: TextStyle(color: Colors.white70, fontWeight: FontWeight.w500)))
                       : ListView.builder(
@@ -960,6 +1177,8 @@ class _FinesScreenState extends State<FinesScreen> with SingleTickerProviderStat
                     physics: const BouncingScrollPhysics(),
                     itemBuilder: (context, index) => _buildFineCard(_paidFines[index], false),
                   ),
+                  // Points History
+                  _buildPointsHistoryTab(),
                 ],
               ),
               Align(
