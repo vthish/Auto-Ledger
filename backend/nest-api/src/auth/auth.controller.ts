@@ -257,7 +257,6 @@ export class OfficerResetPasswordDto {
 export interface AuthRequest {
   user: {
     id: string;
-    sub: string;
     role: string;
   };
 }
@@ -393,7 +392,7 @@ export class AuthController {
     @Body() changePasswordDto: ChangePasswordDto,
   ) {
     return this.authService.changePassword(
-      req.user.sub,
+      req.user.id,
       req.user.role,
       changePasswordDto,
     );
@@ -407,6 +406,6 @@ export class AuthController {
     @Request() req: AuthRequest,
     @Body() changePasswordDto: ChangePasswordDto,
   ) {
-    return this.authService.changeUserPassword(req.user.sub, changePasswordDto);
+    return this.authService.changeUserPassword(req.user.id, changePasswordDto);
   }
 }
