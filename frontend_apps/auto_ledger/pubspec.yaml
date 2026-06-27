@@ -1,4 +1,4 @@
-name: auto_ledger
+name: example
 description: "A new Flutter project."
 publish_to: 'none'
 
@@ -22,10 +22,16 @@ dependencies:
   flutter_dotenv: ^6.0.1
   firebase_auth: ^6.5.2
 
+  # PDF Receipt
+  pdf: ^3.10.4
+  printing: ^5.11.1
+  path_provider: ^2.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
@@ -34,4 +40,10 @@ flutter:
     - assets/flag.png
     - assets/emblem.png
     - assets/punkalasa.png
+    - assets/icon/app_icon.png
     - .env
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon/app_icon.png"
