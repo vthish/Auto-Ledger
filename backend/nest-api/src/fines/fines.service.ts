@@ -403,7 +403,7 @@ export class FinesService {
     });
     if (!license) throw new NotFoundException('License not found');
 
-    return this.prisma.fine.findMany({
+    const fines = await this.prisma.fine.findMany({
       where: { license_Id: license.license_Id },
       include: {
         offenses: { include: { offenceCategory: true } },
@@ -412,6 +412,23 @@ export class FinesService {
       },
       orderBy: { issue_At: 'desc' },
     });
+
+    return Promise.all(
+      fines.map(async (fine) => {
+        const scan = await this.prisma.qR_Scan_History.findFirst({
+          where: {
+            license_Id: fine.license_Id,
+            traffic_Officer_Id: fine.traffic_Officer_Id,
+            scan_Time: { lte: fine.issue_At },
+          },
+          orderBy: { scan_Time: 'desc' },
+        });
+        return {
+          ...fine,
+          scanLocation: scan?.location || null,
+        };
+      }),
+    );
   }
 
   async payFine(fineId: string, amount: number) {
@@ -720,7 +737,7 @@ export class FinesService {
   async getAllFinesForDMT() {
     await this.autoActivateLicenses();
     await this.expireLicensesIfExpired();
-    return this.prisma.fine.findMany({
+    const fines = await this.prisma.fine.findMany({
       include: {
         license: {
           select: { license_No: true, nic_No: true, full_Name: true },
@@ -731,6 +748,24 @@ export class FinesService {
       },
       orderBy: { issue_At: 'desc' },
     });
+
+    return Promise.all(
+      fines.map(async (fine) => {
+        const scan = await this.prisma.qR_Scan_History.findFirst({
+          where: {
+            license_Id: fine.license_Id,
+            traffic_Officer_Id: fine.traffic_Officer_Id,
+            scan_Time: { lte: fine.issue_At },
+          },
+          orderBy: { scan_Time: 'desc' },
+        });
+
+        return {
+          ...fine,
+          scanLocation: scan?.location || null,
+        };
+      }),
+    );
   }
 
   async getProblematicLicensesForDMT() {
@@ -749,7 +784,7 @@ export class FinesService {
     await this.processOverdueFines();
     await this.expireLicensesIfExpired();
 
-    return this.prisma.fine.findMany({
+    const fines = await this.prisma.fine.findMany({
       where: {
         status: { in: ['OVERDUE', 'COURT_CASE'] },
         head_Id: headId,
@@ -764,6 +799,24 @@ export class FinesService {
       },
       orderBy: { issue_At: 'desc' },
     });
+
+    return Promise.all(
+      fines.map(async (fine) => {
+        const scan = await this.prisma.qR_Scan_History.findFirst({
+          where: {
+            license_Id: fine.license_Id,
+            traffic_Officer_Id: fine.traffic_Officer_Id,
+            scan_Time: { lte: fine.issue_At },
+          },
+          orderBy: { scan_Time: 'desc' },
+        });
+
+        return {
+          ...fine,
+          scanLocation: scan?.location || null,
+        };
+      }),
+    );
   }
 
   async getDashboardStats(headId: string) {
@@ -883,7 +936,7 @@ export class FinesService {
   }
 
   async getOfficerFines(officerId: string) {
-    return this.prisma.fine.findMany({
+    const fines = await this.prisma.fine.findMany({
       where: { traffic_Officer_Id: officerId },
       include: {
         license: {
@@ -894,5 +947,23 @@ export class FinesService {
       },
       orderBy: { issue_At: 'desc' },
     });
+
+    return Promise.all(
+      fines.map(async (fine) => {
+        const scan = await this.prisma.qR_Scan_History.findFirst({
+          where: {
+            license_Id: fine.license_Id,
+            traffic_Officer_Id: fine.traffic_Officer_Id,
+            scan_Time: { lte: fine.issue_At },
+          },
+          orderBy: { scan_Time: 'desc' },
+        });
+
+        return {
+          ...fine,
+          scanLocation: scan?.location || null,
+        };
+      }),
+    );
   }
 }

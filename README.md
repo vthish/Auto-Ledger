@@ -44,3 +44,4 @@ Auto-Ledger is a **multi-platform ecosystem** consisting of:
  ┣ 📂 backend
  ┃ ┗ 📂 nest-api                # NestJS Backend API
  ┗ 📜 docker-compose.yml        # Local infrastructure (DB + Redis)
+
