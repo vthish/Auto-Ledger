@@ -1,4 +1,3 @@
-// app/layout.tsx
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -16,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Auto Ledger - Dashboard",
   description: "Sri Lanka Police Traffic Administration System",
+  verification: {
+    google: "google14e1e411f9449f73",
+  },
 };
 
 export default function RootLayout({
