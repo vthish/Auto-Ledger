@@ -280,7 +280,11 @@ export class FinesService {
 
     if (isCourtCase) {
       fineStatus = 'COURT_CASE';
-      newStatus = 'SUSPENDED';
+
+      if (newStatus !== 'REVOKED') {
+        newStatus = 'SUSPENDED';
+      }
+
       if (!isPointSuspension) {
         suspendedUntil = null;
       }
@@ -612,6 +616,13 @@ export class FinesService {
     }
 
     if (verdict === 'ACTIVE') {
+      const isRevokedByPoints =
+        fine.license.has_100_Revoke || fine.license.points >= 100;
+
+      const now = new Date();
+      const isStillSuspended =
+        fine.license.suspended_Until && fine.license.suspended_Until > now;
+
       const otherSeriousFines = await this.prisma.fine.count({
         where: {
           license_Id: fine.license_Id,
@@ -636,46 +647,68 @@ export class FinesService {
           where: { license_Id: fine.license_Id },
         });
 
-        const pendingFines = await tx.fine.findMany({
-          where: {
-            license_Id: fine.license_Id,
-            status: 'PENDING',
-          },
-          orderBy: { issue_At: 'desc' },
-        });
-
-        if (pendingFines.length > 0) {
-          const latestPending = pendingFines[0];
-          await tx.temporary_License.create({
-            data: {
-              license_Id: fine.license_Id,
-              expiry_Date:
-                latestPending.due_Date ||
-                new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-              issued_By: latestPending.traffic_Officer_Id,
-              head_Id: latestPending.head_Id,
-            },
-          });
-
+        if (isRevokedByPoints) {
           await tx.driving_License.update({
             where: { license_Id: fine.license_Id },
-            data: {
-              status: 'TEMPORARY',
-              suspended_Until: null,
-            },
+            data: { status: 'REVOKED' },
           });
         } else {
-          await tx.driving_License.update({
-            where: { license_Id: fine.license_Id },
-            data: {
-              status: 'ACTIVE',
-              suspended_Until: null,
+          const pendingFines = await tx.fine.findMany({
+            where: {
+              license_Id: fine.license_Id,
+              status: 'PENDING',
             },
+            orderBy: { issue_At: 'desc' },
           });
+
+          if (pendingFines.length > 0) {
+            if (!isStillSuspended) {
+              const latestPending = pendingFines[0];
+              await tx.temporary_License.create({
+                data: {
+                  license_Id: fine.license_Id,
+                  expiry_Date:
+                    latestPending.due_Date ||
+                    new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+                  issued_By: latestPending.traffic_Officer_Id,
+                  head_Id: latestPending.head_Id,
+                },
+              });
+
+              await tx.driving_License.update({
+                where: { license_Id: fine.license_Id },
+                data: {
+                  status: 'TEMPORARY',
+                  suspended_Until: null,
+                },
+              });
+            } else {
+              await tx.driving_License.update({
+                where: { license_Id: fine.license_Id },
+                data: {
+                  status: 'SUSPENDED',
+                },
+              });
+            }
+          } else {
+            await tx.driving_License.update({
+              where: { license_Id: fine.license_Id },
+              data: {
+                status: isStillSuspended ? 'SUSPENDED' : 'ACTIVE',
+                suspended_Until: isStillSuspended
+                  ? fine.license.suspended_Until
+                  : null,
+              },
+            });
+          }
         }
       });
 
-      return { message: 'License updated successfully.' };
+      return {
+        message: isRevokedByPoints
+          ? 'Court case resolved, but license remains REVOKED due to exceeding 100 points.'
+          : 'License updated successfully.',
+      };
     } else {
       await this.prisma.$transaction(async (tx) => {
         await tx.fine.update({
@@ -691,6 +724,53 @@ export class FinesService {
 
       return { message: 'License revoked by Divisional Head.' };
     }
+  }
+
+  async resolveRevokedLicense(licenseId: string) {
+    const license = await this.prisma.driving_License.findUnique({
+      where: { license_Id: licenseId },
+      include: {
+        fines: true,
+      },
+    });
+
+    if (!license) throw new NotFoundException('License not found');
+
+    if (license.status !== 'REVOKED') {
+      throw new BadRequestException(
+        'This license is currently not in REVOKED status.',
+      );
+    }
+
+    const unresolvedFines = license.fines.filter(
+      (fine) =>
+        fine.status === 'PENDING' ||
+        fine.status === 'OVERDUE' ||
+        fine.status === 'COURT_CASE',
+    );
+
+    if (unresolvedFines.length > 0) {
+      throw new BadRequestException(
+        'Cannot resolve REVOKE status. All court cases must be resolved and all fines must be paid first.',
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.driving_License.update({
+        where: { license_Id: licenseId },
+        data: {
+          status: 'ACTIVE',
+          points: 0,
+          has_100_Revoke: false,
+          suspended_Until: null,
+        },
+      });
+    });
+
+    return {
+      message:
+        'Revoked license has been completely resolved and is now ACTIVE.',
+    };
   }
 
   async getAllOffenses() {

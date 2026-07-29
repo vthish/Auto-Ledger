@@ -4,6 +4,7 @@
 .idea/
 .vscode/
 .txt
+.txt/
 
 # --- Nest.js Backend ---
 backend/nest-api/node_modules/
