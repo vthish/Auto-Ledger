@@ -2,6 +2,7 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -46,7 +47,7 @@ export class QrService {
     };
   }
 
-  async scanQr(sessionId: string) {
+  async scanQr(sessionId: string, officerId: string) {
     const session = await this.prisma.qrSession.findUnique({
       where: { id: sessionId },
       include: {
@@ -93,6 +94,45 @@ export class QrService {
     const license = session.user.license;
     const activeTempLicense = license.temporaryLicenses[0];
 
+    const officer = await this.prisma.traffic_Officer.findUnique({
+      where: { traffic_Officer_Id: officerId },
+      include: { shifts: true },
+    });
+
+    if (!officer) {
+      throw new NotFoundException('Officer not found');
+    }
+
+    const activeShift = officer.shifts.find(
+      (shift) =>
+        shift.is_Active &&
+        new Date(shift.start_Time) <= currentTime &&
+        new Date(shift.end_Time) >= currentTime,
+    );
+
+    if (!activeShift) {
+      throw new ForbiddenException(
+        'Access Denied: You are not within an active shift schedule.',
+      );
+    }
+
+    const scanLocation = activeShift.location;
+
+    const logScanHistory = async () => {
+      await this.prisma.qR_Scan_History.create({
+        data: {
+          qr_Token: sessionId,
+          scan_Time: new Date(),
+          traffic_Officer_Id: officerId,
+          traffic_Officer_Name: officer.name,
+          driver_Name: session.user.name,
+          location: scanLocation,
+          license_Id: license.license_Id,
+          head_Id: officer.divisional_Head_Id,
+        },
+      });
+    };
+
     if (session.status === 'PENDING') {
       const expiresAt = new Date(currentTime.getTime() + 10 * 60000);
       const updatedSession = await this.prisma.qrSession.update({
@@ -115,11 +155,14 @@ export class QrService {
         },
       });
 
+      await logScanHistory();
+
       return {
         success: true,
         message: 'Scan successful. Timer started.',
         sessionId: updatedSession.id,
         expiresAt: updatedSession.expiresAt,
+        scanLocation: scanLocation,
         driver: {
           userId: updatedSession.user.user_Id,
           name: updatedSession.user.name,
@@ -156,11 +199,14 @@ export class QrService {
         throw new BadRequestException('This QR code has expired.');
       }
 
+      await logScanHistory();
+
       return {
         success: true,
         message: 'Scan successful. Valid within 10 mins.',
         sessionId: session.id,
         expiresAt: session.expiresAt,
+        scanLocation: scanLocation,
         driver: {
           userId: session.user.user_Id,
           name: session.user.name,

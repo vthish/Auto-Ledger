@@ -233,6 +233,7 @@ export class AuthService {
         badgeNo: officer.badge_No,
         divisionName: officer.divisionalHead?.division?.division_Name || null,
         divisionalHeadName: officer.divisionalHead?.name || null,
+        dutyLocation: activeShift.location,
       },
     };
   }
