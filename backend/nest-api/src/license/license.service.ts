@@ -91,6 +91,19 @@ export class LicenseService {
     });
   }
 
+  private validateNic(nicNo: string): string {
+    const normalizedNic = nicNo.trim();
+    const nicRegex = /^(?:\d{9}[VvXx]|\d{12})$/;
+
+    if (!nicRegex.test(normalizedNic)) {
+      throw new BadRequestException(
+        'NIC must contain 9 digits followed by V/X or exactly 12 digits.',
+      );
+    }
+
+    return normalizedNic;
+  }
+
   private async autoActivateLicenses() {
     await this.prisma.driving_License.updateMany({
       where: { status: 'SUSPENDED', suspended_Until: { lte: new Date() } },
@@ -168,17 +181,19 @@ export class LicenseService {
   }
 
   async createLicense(data: CreateLicenseData) {
+    const nicNo = this.validateNic(data.nicNo);
+
     let user = await this.prisma.user.findUnique({
-      where: { nic_No: data.nicNo },
+      where: { nic_No: nicNo },
     });
 
     if (!user) {
       user = await this.prisma.user.create({
         data: {
-          nic_No: data.nicNo,
+          nic_No: nicNo,
           name: 'Pending App Registration',
           password: 'NOT_REGISTERED',
-          email: `pending_${data.nicNo}@example.com`,
+          email: `pending_${nicNo}@example.com`,
           device_Id: 'PENDING',
         },
       });
@@ -188,7 +203,7 @@ export class LicenseService {
       data: {
         license_No: data.licenseNo,
         full_Name: data.fullName,
-        nic_No: data.nicNo,
+        nic_No: nicNo,
         address: data.address,
         blood_Group: data.bloodGroup,
         date_of_birth: new Date(data.dateOfBirth),

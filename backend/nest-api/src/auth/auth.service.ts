@@ -4,6 +4,7 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
@@ -116,6 +117,30 @@ export class AuthService {
 
   private generateOtp(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
+  private validateNic(nicNo: string): string {
+    const normalizedNic = nicNo.trim();
+    const nicRegex = /^(?:\d{9}[VvXx]|\d{12})$/;
+
+    if (!nicRegex.test(normalizedNic)) {
+      throw new BadRequestException(
+        'NIC must contain 9 digits followed by V/X or exactly 12 digits.',
+      );
+    }
+
+    return normalizedNic;
+  }
+
+  private validateStrongPassword(password: string): void {
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
+    if (!passwordRegex.test(password)) {
+      throw new BadRequestException(
+        'Password must be at least 8 characters and contain an uppercase letter, lowercase letter, number, and special character.',
+      );
+    }
   }
 
   async loginAdmin(username: string, pass: string, type: 'DMT' | 'POLICE') {
@@ -482,13 +507,24 @@ export class AuthService {
   }
 
   async registerUser(data: RegisterData) {
+    const nicNo = this.validateNic(data.nicNo);
+    const email = data.email.trim().toLowerCase();
+
+    this.validateStrongPassword(data.password);
+
     const user = await this.prisma.user.findUnique({
-      where: { nic_No: data.nicNo },
+      where: { nic_No: nicNo },
     });
 
     if (!user) {
       throw new BadRequestException(
-        'Registration Failed: No user found for this NIC.',
+        'Registration Failed: No DMT-issued driving license was found for this NIC.',
+      );
+    }
+
+    if (user.isEmailVerified) {
+      throw new ConflictException(
+        'An account is already registered for this NIC. Please login.',
       );
     }
 
@@ -498,7 +534,17 @@ export class AuthService {
 
     if (!license) {
       throw new BadRequestException(
-        'Registration Failed: No driving license found for this NIC.',
+        'Registration Failed: No DMT-issued driving license was found for this NIC.',
+      );
+    }
+
+    const emailOwner = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (emailOwner && emailOwner.user_Id !== user.user_Id) {
+      throw new ConflictException(
+        'An account is already registered with this email address.',
       );
     }
 
@@ -507,10 +553,10 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     await this.prisma.user.update({
-      where: { nic_No: data.nicNo },
+      where: { user_Id: user.user_Id },
       data: {
-        name: data.name,
-        email: data.email,
+        name: data.name.trim(),
+        email,
         password: hashedPassword,
         device_Id: data.deviceId,
         isEmailVerified: false,
@@ -519,7 +565,7 @@ export class AuthService {
       },
     });
 
-    await this.sendOtpEmail(data.email, otp, 'registration');
+    await this.sendOtpEmail(email, otp, 'registration');
 
     return {
       message: 'OTP sent to your email. Please verify.',
@@ -528,13 +574,26 @@ export class AuthService {
   }
 
   async verifyRegistration(nicNo: string, otp: string) {
+    const normalizedNicNo = this.validateNic(nicNo);
+
     const user = await this.prisma.user.findUnique({
-      where: { nic_No: nicNo },
+      where: { nic_No: normalizedNicNo },
     });
 
-    if (!user) throw new BadRequestException('User not found.');
-    if (user.registration_Otp !== otp)
+    if (!user) {
+      throw new BadRequestException('User not found.');
+    }
+
+    if (user.isEmailVerified) {
+      throw new ConflictException(
+        'This NIC is already registered. Please login.',
+      );
+    }
+
+    if (user.registration_Otp !== otp.trim()) {
       throw new BadRequestException('Invalid OTP.');
+    }
+
     if (
       !user.registration_Otp_Expires_At ||
       new Date() > user.registration_Otp_Expires_At
@@ -542,8 +601,8 @@ export class AuthService {
       throw new BadRequestException('OTP has expired.');
     }
 
-    const updatedUser = await this.prisma.user.update({
-      where: { nic_No: nicNo },
+    await this.prisma.user.update({
+      where: { user_Id: user.user_Id },
       data: {
         isEmailVerified: true,
         registration_Otp: null,
@@ -551,7 +610,10 @@ export class AuthService {
       },
     });
 
-    return this.generateUserToken(updatedUser);
+    return {
+      success: true,
+      message: 'Registration successful. Please login.',
+    };
   }
 
   async loginUser(nicNo: string, pass: string, deviceId: string) {
@@ -631,6 +693,8 @@ export class AuthService {
     userId: string,
     dto: { oldPassword: string; newPassword: string },
   ) {
+    this.validateStrongPassword(dto.newPassword);
+
     const user = await this.prisma.user.findUnique({
       where: { user_Id: userId },
     });
@@ -656,8 +720,10 @@ export class AuthService {
   }
 
   async requestPasswordReset(nicNo: string, email: string) {
+    const normalizedNicNo = this.validateNic(nicNo);
+
     const user = await this.prisma.user.findUnique({
-      where: { nic_No: nicNo },
+      where: { nic_No: normalizedNicNo },
     });
 
     if (!user || user.email !== email) {
@@ -668,7 +734,7 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
     await this.prisma.user.update({
-      where: { nic_No: nicNo },
+      where: { nic_No: normalizedNicNo },
       data: { reset_Otp: otp, reset_Otp_Expires_At: expiresAt },
     });
 
@@ -677,8 +743,10 @@ export class AuthService {
   }
 
   async verifyUserResetOtp(nicNo: string, email: string, otp: string) {
+    const normalizedNicNo = this.validateNic(nicNo);
+
     const user = await this.prisma.user.findUnique({
-      where: { nic_No: nicNo },
+      where: { nic_No: normalizedNicNo },
     });
 
     if (!user || user.email !== email) {
@@ -698,8 +766,11 @@ export class AuthService {
     otp: string,
     newPasswordStr: string,
   ) {
+    const normalizedNicNo = this.validateNic(nicNo);
+    this.validateStrongPassword(newPasswordStr);
+
     const user = await this.prisma.user.findUnique({
-      where: { nic_No: nicNo },
+      where: { nic_No: normalizedNicNo },
     });
 
     if (!user || user.email !== email) {
@@ -714,7 +785,7 @@ export class AuthService {
     const hashedNewPassword = await bcrypt.hash(newPasswordStr, 10);
 
     await this.prisma.user.update({
-      where: { nic_No: nicNo },
+      where: { nic_No: normalizedNicNo },
       data: {
         password: hashedNewPassword,
         reset_Otp: null,

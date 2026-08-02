@@ -33,8 +33,13 @@ import {
   IsOptional,
   IsArray,
   ValidateNested,
+  Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+
+const NIC_REGEX = /^(?:\d{9}[VvXx]|\d{12})$/;
+const NIC_VALIDATION_MESSAGE =
+  'NIC must contain 9 digits followed by V/X or exactly 12 digits.';
 
 export interface AuthRequest {
   user: { id: string };
@@ -77,9 +82,14 @@ export class CreateLicenseDto {
   @IsNotEmpty()
   fullName: string;
 
-  @ApiProperty({ example: '200204802139' })
+  @ApiProperty({
+    example: '200204802139',
+    description:
+      'Old NIC: 9 digits followed by V/X. New NIC: exactly 12 digits.',
+  })
   @IsString()
   @IsNotEmpty()
+  @Matches(NIC_REGEX, { message: NIC_VALIDATION_MESSAGE })
   nicNo: string;
 
   @ApiProperty({ example: 'No 10, Galle Road, Galle' })
