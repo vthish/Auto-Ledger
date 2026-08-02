@@ -66,3 +66,6 @@ android/.gradle/
 android/local.properties
 ios/Runner/GeneratedPluginRegistrant.*
 macos/Flutter/GeneratedPluginRegistrant.*
+
+# FVM Version Cache
+.fvm/
