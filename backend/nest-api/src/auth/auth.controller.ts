@@ -24,6 +24,15 @@ import {
   IsEmail,
 } from 'class-validator';
 
+const NIC_REGEX = /^(?:\d{9}[VvXx]|\d{12})$/;
+const STRONG_PASSWORD_REGEX =
+  /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+
+const NIC_VALIDATION_MESSAGE =
+  'NIC must contain 9 digits followed by V/X or exactly 12 digits.';
+const PASSWORD_VALIDATION_MESSAGE =
+  'Password must be at least 8 characters and contain an uppercase letter, lowercase letter, number, and special character.';
+
 export class AdminLoginDto {
   @ApiProperty({ example: 'mainpolice' })
   @IsString()
@@ -68,6 +77,7 @@ export class RegisterUserDto {
   @ApiProperty({ example: '200204802139' })
   @IsString()
   @IsNotEmpty()
+  @Matches(NIC_REGEX, { message: NIC_VALIDATION_MESSAGE })
   nicNo: string;
 
   @ApiProperty({ example: 'K.V.V. Thishan' })
@@ -83,9 +93,9 @@ export class RegisterUserDto {
   @ApiProperty({ example: 'Driver@Pass123!' })
   @IsString()
   @MinLength(8)
-  @Matches(
-    /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
-  )
+  @Matches(STRONG_PASSWORD_REGEX, {
+    message: PASSWORD_VALIDATION_MESSAGE,
+  })
   password: string;
 
   @ApiProperty({ example: 'PHONE-MAC-001' })
@@ -98,6 +108,7 @@ export class VerifyRegistrationDto {
   @ApiProperty({ example: '200204802139' })
   @IsString()
   @IsNotEmpty()
+  @Matches(NIC_REGEX, { message: NIC_VALIDATION_MESSAGE })
   nicNo: string;
 
   @ApiProperty({ example: '123456' })
@@ -110,6 +121,7 @@ export class UserLoginDto {
   @ApiProperty({ example: '200204802139' })
   @IsString()
   @IsNotEmpty()
+  @Matches(NIC_REGEX, { message: NIC_VALIDATION_MESSAGE })
   nicNo: string;
 
   @ApiProperty({ example: 'Driver@Pass123!' })
@@ -127,6 +139,7 @@ export class VerifyDeviceDto {
   @ApiProperty({ example: '200204802139' })
   @IsString()
   @IsNotEmpty()
+  @Matches(NIC_REGEX, { message: NIC_VALIDATION_MESSAGE })
   nicNo: string;
 
   @ApiProperty({ example: 'NEW-PHONE-MAC-002' })
@@ -149,7 +162,10 @@ export class ChangePasswordDto {
   @ApiProperty()
   @IsString()
   @IsNotEmpty()
-  @MinLength(6)
+  @MinLength(8)
+  @Matches(STRONG_PASSWORD_REGEX, {
+    message: PASSWORD_VALIDATION_MESSAGE,
+  })
   newPassword: string;
 }
 
@@ -157,6 +173,7 @@ export class BiometricLoginDto {
   @ApiProperty({ example: '200204802139' })
   @IsString()
   @IsNotEmpty()
+  @Matches(NIC_REGEX, { message: NIC_VALIDATION_MESSAGE })
   nicNo: string;
 
   @ApiProperty({ example: 'PHONE-MAC-001' })
@@ -169,6 +186,7 @@ export class ForgotPasswordRequestDto {
   @ApiProperty({ example: '200204802139' })
   @IsString()
   @IsNotEmpty()
+  @Matches(NIC_REGEX, { message: NIC_VALIDATION_MESSAGE })
   nicNo: string;
 
   @ApiProperty({ example: 'user@example.com' })
@@ -181,6 +199,7 @@ export class VerifyResetOtpDto {
   @ApiProperty({ example: '200204802139' })
   @IsString()
   @IsNotEmpty()
+  @Matches(NIC_REGEX, { message: NIC_VALIDATION_MESSAGE })
   nicNo: string;
 
   @ApiProperty({ example: 'user@example.com' })
@@ -198,6 +217,7 @@ export class ResetPasswordDto {
   @ApiProperty({ example: '200204802139' })
   @IsString()
   @IsNotEmpty()
+  @Matches(NIC_REGEX, { message: NIC_VALIDATION_MESSAGE })
   nicNo: string;
 
   @ApiProperty({ example: 'user@example.com' })
@@ -214,6 +234,9 @@ export class ResetPasswordDto {
   @IsString()
   @IsNotEmpty()
   @MinLength(8)
+  @Matches(STRONG_PASSWORD_REGEX, {
+    message: PASSWORD_VALIDATION_MESSAGE,
+  })
   newPassword: string;
 }
 
@@ -325,6 +348,7 @@ export class ResendRegistrationOtpDto {
   @ApiProperty({ example: '200204802139' })
   @IsString()
   @IsNotEmpty()
+  @Matches(NIC_REGEX, { message: NIC_VALIDATION_MESSAGE })
   nicNo: string;
 }
 
@@ -332,6 +356,7 @@ export class ResendResetOtpDto {
   @ApiProperty({ example: '200204802139' })
   @IsString()
   @IsNotEmpty()
+  @Matches(NIC_REGEX, { message: NIC_VALIDATION_MESSAGE })
   nicNo: string;
 
   @ApiProperty({ example: 'user@example.com' })
@@ -344,6 +369,7 @@ export class ResendDeviceOtpDto {
   @ApiProperty({ example: '200204802139' })
   @IsString()
   @IsNotEmpty()
+  @Matches(NIC_REGEX, { message: NIC_VALIDATION_MESSAGE })
   nicNo: string;
 
   @ApiProperty({ example: 'user@example.com' })

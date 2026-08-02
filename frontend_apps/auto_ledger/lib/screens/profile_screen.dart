@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import '../services/biometric_service.dart';
 import '../utils/secure_storage.dart';
+import '../utils/device_info.dart';
 import '../utils/settings_util.dart';
 import 'login_screen.dart';
 
@@ -450,22 +452,53 @@ class _ProfileScreenState extends State<ProfileScreen>
                                       setModalState(() => isVerifying = true);
 
                                       try {
-                                        final tempPassword =
-                                            '${enteredPassword}_verify_temp';
+                                        final deviceId =
+                                            await DeviceInfoUtil.getDeviceId();
+                                        final loginResult =
+                                            await AuthService.loginUser(
+                                          _nic,
+                                          enteredPassword,
+                                          deviceId,
+                                        );
 
-                                        await ApiService.dio.patch(
-                                            '/auth/user/change-password',
-                                            data: {
-                                              'oldPassword': enteredPassword,
-                                              'newPassword': tempPassword,
-                                            });
+                                        if (!dialogContext.mounted) {
+                                          return;
+                                        }
 
-                                        await ApiService.dio.patch(
-                                            '/auth/user/change-password',
-                                            data: {
-                                              'oldPassword': tempPassword,
-                                              'newPassword': enteredPassword,
-                                            });
+                                        if (loginResult['isDeviceMismatch'] ==
+                                            true) {
+                                          await SettingsUtil
+                                              .setBiometricEnabled(false);
+                                          await SecureStorage.deleteNic();
+
+                                          if (!dialogContext.mounted) {
+                                            return;
+                                          }
+
+                                          setModalState(() {
+                                            isVerifying = false;
+                                            isNativeAuth = false;
+                                          });
+
+                                          _showGlassToast(
+                                            'This device is not verified. Please login again.',
+                                            isError: true,
+                                          );
+                                          return;
+                                        }
+
+                                        if (loginResult['success'] != true) {
+                                          setModalState(() {
+                                            isVerifying = false;
+                                            isNativeAuth = false;
+                                          });
+
+                                          _showGlassToast(
+                                            'Wrong current password. Please try again.',
+                                            isError: true,
+                                          );
+                                          return;
+                                        }
 
                                         setModalState(() {
                                           isVerifying = false;
@@ -476,15 +509,17 @@ class _ProfileScreenState extends State<ProfileScreen>
                                             await _biometricService
                                                 .authenticate();
 
+                                        if (!dialogContext.mounted) {
+                                          return;
+                                        }
+
                                         setModalState(() {
                                           isNativeAuth = false;
                                         });
 
                                         if (!nativeAuthenticated) {
-                                          if (dialogContext.mounted) {
-                                            Navigator.of(dialogContext)
-                                                .pop(false);
-                                          }
+                                          Navigator.of(dialogContext)
+                                              .pop(false);
                                           return;
                                         }
 
@@ -495,24 +530,18 @@ class _ProfileScreenState extends State<ProfileScreen>
                                         if (dialogContext.mounted) {
                                           Navigator.of(dialogContext).pop(true);
                                         }
-                                      } on DioException catch (e) {
-                                        setModalState(() {
-                                          isVerifying = false;
-                                          isNativeAuth = false;
-                                        });
-                                        final errorMsg = e
-                                                .response?.data['message'] ??
-                                            'Wrong old password. Please try again.';
-                                        _showGlassToast(errorMsg,
-                                            isError: true);
                                       } catch (e) {
-                                        setModalState(() {
-                                          isVerifying = false;
-                                          isNativeAuth = false;
-                                        });
+                                        if (dialogContext.mounted) {
+                                          setModalState(() {
+                                            isVerifying = false;
+                                            isNativeAuth = false;
+                                          });
+                                        }
+
                                         _showGlassToast(
-                                            'An error occurred. Please try again.',
-                                            isError: true);
+                                          'An error occurred. Please try again.',
+                                          isError: true,
+                                        );
                                       }
                                     },
                               child: isVerifying || isNativeAuth

@@ -3,34 +3,102 @@ import 'api_service.dart';
 import '../utils/secure_storage.dart';
 
 class AuthService {
-  static Future<bool> registerUser(Map<String, dynamic> data) async {
+  static String _errorMessage(
+    DioException error,
+    String fallback,
+  ) {
+    final data = error.response?.data;
+
+    if (data is Map<String, dynamic>) {
+      final message = data['message'];
+
+      if (message is List && message.isNotEmpty) {
+        return message.first.toString();
+      }
+
+      if (message != null && message.toString().trim().isNotEmpty) {
+        return message.toString();
+      }
+    }
+
+    return fallback;
+  }
+
+  static Future<Map<String, dynamic>> registerUser(
+    Map<String, dynamic> data,
+  ) async {
     try {
       final response =
           await ApiService.dio.post('/auth/user/register', data: data);
-      return response.statusCode == 201 || response.statusCode == 200;
-    } on DioException {
-      return false;
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return {
+          'success': true,
+          'message': response.data is Map<String, dynamic>
+              ? response.data['message'] ?? 'OTP sent successfully.'
+              : 'OTP sent successfully.',
+        };
+      }
+
+      return {
+        'success': false,
+        'message': 'Registration failed. Please try again.',
+      };
+    } on DioException catch (error) {
+      return {
+        'success': false,
+        'message': _errorMessage(
+          error,
+          'Registration failed. Please check your NIC and email.',
+        ),
+      };
     } catch (e) {
-      return false;
+      return {
+        'success': false,
+        'message': 'Registration failed. Please try again.',
+      };
     }
   }
 
-  static Future<bool> verifyRegistration(String nicNo, String otp) async {
+  static Future<Map<String, dynamic>> verifyRegistration(
+    String nicNo,
+    String otp,
+  ) async {
     try {
       final response = await ApiService.dio.post(
         '/auth/user/verify-registration',
         data: {'nicNo': nicNo, 'otp': otp},
       );
+
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final token = response.data['accessToken'];
-        await SecureStorage.saveToken(token);
-        return true;
+        await SecureStorage.deleteToken();
+
+        return {
+          'success': true,
+          'message': response.data is Map<String, dynamic>
+              ? response.data['message'] ??
+                  'Registration successful. Please login.'
+              : 'Registration successful. Please login.',
+        };
       }
-      return false;
-    } on DioException {
-      return false;
+
+      return {
+        'success': false,
+        'message': 'OTP verification failed.',
+      };
+    } on DioException catch (error) {
+      return {
+        'success': false,
+        'message': _errorMessage(
+          error,
+          'Invalid OTP. Please try again.',
+        ),
+      };
     } catch (e) {
-      return false;
+      return {
+        'success': false,
+        'message': 'OTP verification failed.',
+      };
     }
   }
 
