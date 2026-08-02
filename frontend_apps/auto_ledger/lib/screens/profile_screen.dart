@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import '../services/api_service.dart';
+import '../services/biometric_service.dart';
 import '../utils/secure_storage.dart';
 import '../utils/settings_util.dart';
 import 'login_screen.dart';
@@ -21,7 +22,8 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with WidgetsBindingObserver {
   bool _isLoading = true;
   String _errorMessage = '';
 
@@ -33,27 +35,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   bool _isBiometricEnabled = false;
   bool _isChangingPassword = false;
+  bool _isBiometricAvailable = false;
 
   final _oldPwController = TextEditingController();
   final _newPwController = TextEditingController();
   final _confirmPwController = TextEditingController();
+  final BiometricService _biometricService = BiometricService();
 
   OverlayEntry? _overlayEntry;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkBiometricStatus();
+    _checkBiometricAvailability();
     _fetchUserProfile();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _overlayEntry?.remove();
     _oldPwController.dispose();
     _newPwController.dispose();
     _confirmPwController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkBiometricStatus();
+      _checkBiometricAvailability();
+    }
   }
 
   void _showGlassToast(String message, {bool isError = false}) {
@@ -131,21 +146,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
 
-    Navigator.of(context, rootNavigator: true).overlay?.insert(_overlayEntry!);
-
-    Future.delayed(const Duration(seconds: 3), () {
-      if (_overlayEntry != null && _overlayEntry!.mounted) {
-        _overlayEntry!.remove();
-        _overlayEntry = null;
-      }
-    });
+    final overlay = Navigator.of(context, rootNavigator: true).overlay;
+    if (overlay != null) {
+      overlay.insert(_overlayEntry!);
+      Future.delayed(const Duration(seconds: 3), () {
+        if (_overlayEntry != null && _overlayEntry!.mounted) {
+          _overlayEntry!.remove();
+          _overlayEntry = null;
+        }
+      });
+    }
   }
 
   Future<void> _checkBiometricStatus() async {
     final isEnabled = await SettingsUtil.isBiometricEnabled();
-    setState(() {
-      _isBiometricEnabled = isEnabled;
-    });
+    if (mounted) {
+      setState(() {
+        _isBiometricEnabled = isEnabled;
+      });
+    }
+  }
+
+  Future<void> _checkBiometricAvailability() async {
+    final available = await _biometricService.checkBiometricsAvailable();
+    if (mounted) {
+      setState(() {
+        _isBiometricAvailable = available;
+      });
+    }
   }
 
   Future<void> _fetchUserProfile() async {
@@ -242,16 +270,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
 
         if (dialogContext.mounted) {
-          Navigator.pop(dialogContext);
+          Navigator.pop(dialogContext, true);
         }
 
         _oldPwController.clear();
         _newPwController.clear();
         _confirmPwController.clear();
-
-        _showGlassToast('Password updated successfully!');
-        widget.onLogActivity(
-            'Password Changed Successfully', Icons.password_rounded);
       }
     } on DioException catch (e) {
       if (mounted) {
@@ -274,18 +298,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  void _showBiometricPasswordDialog() {
+  void _showBiometricPasswordDialog() async {
     final TextEditingController pwController = TextEditingController();
     bool isObscured = true;
     bool isVerifying = false;
+    bool isNativeAuth = false;
 
     widget.onLogActivity('Attempted to Toggle Biometrics', Icons.fingerprint);
 
-    showDialog(
+    final bool? result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       barrierColor: Colors.black.withAlpha(160),
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return StatefulBuilder(
           builder: (context, setModalState) {
             return BackdropFilter(
@@ -386,8 +411,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     borderRadius: BorderRadius.circular(16)),
                               ),
                               onPressed: () {
-                                Navigator.pop(context);
-                                setState(() => _isBiometricEnabled = false);
+                                if (mounted) {
+                                  Navigator.of(dialogContext).pop();
+                                }
                               },
                               child: const Text('Cancel',
                                   style: TextStyle(
@@ -410,7 +436,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         color: Colors.white.withAlpha(80),
                                         width: 1)),
                               ),
-                              onPressed: isVerifying
+                              onPressed: isVerifying || isNativeAuth
                                   ? null
                                   : () async {
                                       final enteredPassword =
@@ -441,37 +467,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                               'newPassword': enteredPassword,
                                             });
 
-                                        if (mounted) {
-                                          // ignore: use_build_context_synchronously
-                                          Navigator.pop(context);
-                                          SettingsUtil.setBiometricEnabled(
-                                              true);
-                                          setState(
-                                              () => _isBiometricEnabled = true);
-                                          SecureStorage.saveNic(_nic);
-                                          _showGlassToast(
-                                              'Biometrics Enabled Successfully!');
-                                          widget.onLogActivity(
-                                              'Enabled Biometric Login',
-                                              Icons.fingerprint_rounded);
+                                        setModalState(() {
+                                          isVerifying = false;
+                                          isNativeAuth = true;
+                                        });
+
+                                        final nativeAuthenticated =
+                                            await _biometricService
+                                                .authenticate();
+
+                                        setModalState(() {
+                                          isNativeAuth = false;
+                                        });
+
+                                        if (!nativeAuthenticated) {
+                                          if (dialogContext.mounted) {
+                                            Navigator.of(dialogContext)
+                                                .pop(false);
+                                          }
+                                          return;
+                                        }
+
+                                        await SettingsUtil.setBiometricEnabled(
+                                            true);
+                                        await SecureStorage.saveNic(_nic);
+
+                                        if (dialogContext.mounted) {
+                                          Navigator.of(dialogContext).pop(true);
                                         }
                                       } on DioException catch (e) {
-                                        setModalState(
-                                            () => isVerifying = false);
+                                        setModalState(() {
+                                          isVerifying = false;
+                                          isNativeAuth = false;
+                                        });
                                         final errorMsg = e
                                                 .response?.data['message'] ??
-                                            'Invalid password. Please try again.';
+                                            'Wrong old password. Please try again.';
                                         _showGlassToast(errorMsg,
                                             isError: true);
                                       } catch (e) {
-                                        setModalState(
-                                            () => isVerifying = false);
+                                        setModalState(() {
+                                          isVerifying = false;
+                                          isNativeAuth = false;
+                                        });
                                         _showGlassToast(
                                             'An error occurred. Please try again.',
                                             isError: true);
                                       }
                                     },
-                              child: isVerifying
+                              child: isVerifying || isNativeAuth
                                   ? const SizedBox(
                                       width: 20,
                                       height: 20,
@@ -499,9 +543,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       },
     );
+
+    if (result == true && mounted) {
+      setState(() {
+        _isBiometricEnabled = true;
+      });
+      Future.microtask(() {
+        _showGlassToast('Biometric Enabled Successfully!');
+        widget.onLogActivity(
+            'Enabled Biometric Login', Icons.fingerprint_rounded);
+      });
+    } else if (result == false && mounted) {
+      Future.microtask(() {
+        _showGlassToast('Biometric authentication failed. Please try again.',
+            isError: true);
+      });
+    }
   }
 
-  void _showChangePasswordDialog() {
+  void _showChangePasswordDialog() async {
     widget.onLogActivity(
         'Opened Password Change Dialog', Icons.password_rounded);
 
@@ -512,7 +572,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _newPwController.clear();
     _confirmPwController.clear();
 
-    showDialog(
+    final bool? result = await showDialog<bool>(
       context: context,
       barrierColor: Colors.black.withAlpha(160),
       builder: (BuildContext dialogContext) {
@@ -638,6 +698,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         );
       },
     );
+
+    if (result == true && mounted) {
+      Future.microtask(() {
+        _showGlassToast('Password updated successfully!');
+        widget.onLogActivity(
+            'Password Changed Successfully', Icons.password_rounded);
+      });
+    }
   }
 
   Future<void> _logout() async {
@@ -980,6 +1048,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildBiometricToggle() {
+    if (!_isBiometricAvailable) {
+      return const SizedBox.shrink();
+    }
+
     return _buildGlassCard(
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1012,7 +1084,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 _showBiometricPasswordDialog();
               } else {
                 SettingsUtil.setBiometricEnabled(false);
-                setState(() => _isBiometricEnabled = false);
+                if (mounted) {
+                  setState(() => _isBiometricEnabled = false);
+                }
                 SecureStorage.deleteNic();
                 _showGlassToast('Biometric login disabled.', isError: true);
                 widget.onLogActivity(
@@ -1072,204 +1146,211 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        _buildGlassBackground(),
-        Scaffold(
-          backgroundColor: Colors.transparent,
-          extendBodyBehindAppBar: true,
-          appBar: AppBar(
-            automaticallyImplyLeading: false,
-            backgroundColor: const Color(0xFF0B0F19).withAlpha(120),
-            flexibleSpace: ClipRect(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border(
-                        bottom: BorderSide(
-                            color: Colors.white.withAlpha(40), width: 1.0)),
+    return RepaintBoundary(
+      child: Stack(
+        children: [
+          _buildGlassBackground(),
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            extendBodyBehindAppBar: true,
+            appBar: AppBar(
+              automaticallyImplyLeading: false,
+              backgroundColor: const Color(0xFF0B0F19).withAlpha(120),
+              flexibleSpace: ClipRect(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border(
+                          bottom: BorderSide(
+                              color: Colors.white.withAlpha(40), width: 1.0)),
+                    ),
                   ),
                 ),
               ),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              centerTitle: true,
+              title: const Text('My Profile',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                      letterSpacing: 0.5)),
             ),
-            foregroundColor: Colors.white,
-            elevation: 0,
-            centerTitle: true,
-            title: const Text('My Profile',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                    letterSpacing: 0.5)),
-          ),
-          body: _isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(color: Colors.white))
-              : _errorMessage.isNotEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.error_outline,
-                              color: Colors.red.shade400, size: 50),
-                          const SizedBox(height: 16),
-                          Text(_errorMessage,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600)),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white.withAlpha(30),
-                                  shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12))),
-                              onPressed: () {
-                                widget.onLogActivity(
-                                    'Retried loading profile', Icons.refresh);
-                                _fetchUserProfile();
-                              },
-                              child: const Text('Retry',
-                                  style: TextStyle(color: Colors.white)))
-                        ],
-                      ),
-                    )
-                  : SafeArea(
-                      child: RefreshIndicator(
-                        onRefresh: _fetchUserProfile,
-                        color: Colors.cyanAccent,
-                        backgroundColor: Colors.white.withAlpha(20),
-                        child: ScrollConfiguration(
-                          behavior: ScrollConfiguration.of(context).copyWith(
-                            physics: const BouncingScrollPhysics(
-                              parent: AlwaysScrollableScrollPhysics(),
+            body: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Colors.white))
+                : _errorMessage.isNotEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.error_outline,
+                                color: Colors.red.shade400, size: 50),
+                            const SizedBox(height: 16),
+                            Text(_errorMessage,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.white.withAlpha(30),
+                                    shape: RoundedRectangleBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(12))),
+                                onPressed: () {
+                                  widget.onLogActivity(
+                                      'Retried loading profile', Icons.refresh);
+                                  _fetchUserProfile();
+                                },
+                                child: const Text('Retry',
+                                    style: TextStyle(color: Colors.white)))
+                          ],
+                        ),
+                      )
+                    : SafeArea(
+                        child: RefreshIndicator(
+                          onRefresh: _fetchUserProfile,
+                          color: Colors.cyanAccent,
+                          backgroundColor: Colors.white.withAlpha(20),
+                          child: ScrollConfiguration(
+                            behavior: ScrollConfiguration.of(context).copyWith(
+                              physics: const BouncingScrollPhysics(
+                                parent: AlwaysScrollableScrollPhysics(),
+                              ),
                             ),
-                          ),
-                          child: SingleChildScrollView(
-                            physics: const BouncingScrollPhysics(
-                              parent: AlwaysScrollableScrollPhysics(),
-                            ),
-                            padding: const EdgeInsets.only(
-                              top: 16,
-                              left: 20,
-                              right: 20,
-                              bottom: 120,
-                            ),
-                            child: Column(
-                              children: [
-                                _buildProfileHeader(),
-                                const SizedBox(height: 20),
-                                _buildPointsWidget(),
-                                const SizedBox(height: 20),
-                                _buildGlassCard(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Icon(Icons.location_on_rounded,
-                                              color:
-                                                  Colors.white.withAlpha(200),
-                                              size: 20),
-                                          const SizedBox(width: 8),
-                                          const Text('Registered Address',
-                                              style: TextStyle(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.w900,
-                                                  fontSize: 14)),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Text(_address,
-                                          style: const TextStyle(
-                                              color: Colors.white70,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 14,
-                                              height: 1.4)),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                                _buildBiometricToggle(),
-                                const SizedBox(height: 20),
-                                _buildGlassCard(
-                                  padding: const EdgeInsets.all(4),
-                                  child: ListTile(
-                                    onTap: _showChangePasswordDialog,
-                                    leading: Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                          color: Colors.white.withAlpha(15),
-                                          shape: BoxShape.circle),
-                                      child: const Icon(Icons.password_rounded,
-                                          color: Colors.white),
-                                    ),
-                                    title: const Text('Change Password',
-                                        style: TextStyle(
-                                            fontWeight: FontWeight.w900,
-                                            color: Colors.white,
-                                            fontSize: 15)),
-                                    trailing: const Icon(
-                                        Icons.arrow_forward_ios_rounded,
-                                        color: Colors.white70,
-                                        size: 16),
-                                  ),
-                                ),
-                                const SizedBox(height: 30),
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(20),
-                                  child: BackdropFilter(
-                                    filter: ImageFilter.blur(
-                                        sigmaX: 30, sigmaY: 30),
-                                    child: SizedBox(
-                                      width: double.infinity,
-                                      height: 60,
-                                      child: ElevatedButton(
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor:
-                                              Colors.red.shade50.withAlpha(15),
-                                          foregroundColor: Colors.red.shade300,
-                                          elevation: 0,
-                                          shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(20),
-                                              side: BorderSide(
-                                                  color: Colors.redAccent
-                                                      .withAlpha(50),
-                                                  width: 1.0)),
-                                        ),
-                                        onPressed: () {
-                                          HapticFeedback.lightImpact();
-                                          widget.onLogActivity(
-                                              'Initiated Logout', Icons.logout);
-                                          _logout();
-                                        },
-                                        child: const Row(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
+                            child: SingleChildScrollView(
+                              physics: const BouncingScrollPhysics(
+                                parent: AlwaysScrollableScrollPhysics(),
+                              ),
+                              padding: const EdgeInsets.only(
+                                top: 16,
+                                left: 20,
+                                right: 20,
+                                bottom: 120,
+                              ),
+                              child: Column(
+                                children: [
+                                  _buildProfileHeader(),
+                                  const SizedBox(height: 20),
+                                  _buildPointsWidget(),
+                                  const SizedBox(height: 20),
+                                  _buildGlassCard(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
                                           children: [
-                                            Icon(Icons.logout_rounded,
-                                                size: 22),
-                                            SizedBox(width: 10),
-                                            Text('Log Out',
+                                            Icon(Icons.location_on_rounded,
+                                                color:
+                                                    Colors.white.withAlpha(200),
+                                                size: 20),
+                                            const SizedBox(width: 8),
+                                            const Text('Registered Address',
                                                 style: TextStyle(
+                                                    color: Colors.white,
                                                     fontWeight: FontWeight.w900,
-                                                    fontSize: 16)),
+                                                    fontSize: 14)),
                                           ],
                                         ),
+                                        const SizedBox(height: 10),
+                                        Text(_address,
+                                            style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 14,
+                                                height: 1.4)),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+                                  _buildBiometricToggle(),
+                                  const SizedBox(height: 20),
+                                  _buildGlassCard(
+                                    padding: const EdgeInsets.all(4),
+                                    child: ListTile(
+                                      onTap: _showChangePasswordDialog,
+                                      leading: Container(
+                                        padding: const EdgeInsets.all(8),
+                                        decoration: BoxDecoration(
+                                            color: Colors.white.withAlpha(15),
+                                            shape: BoxShape.circle),
+                                        child: const Icon(
+                                            Icons.password_rounded,
+                                            color: Colors.white),
+                                      ),
+                                      title: const Text('Change Password',
+                                          style: TextStyle(
+                                              fontWeight: FontWeight.w900,
+                                              color: Colors.white,
+                                              fontSize: 15)),
+                                      trailing: const Icon(
+                                          Icons.arrow_forward_ios_rounded,
+                                          color: Colors.white70,
+                                          size: 16),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 30),
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(20),
+                                    child: BackdropFilter(
+                                      filter: ImageFilter.blur(
+                                          sigmaX: 30, sigmaY: 30),
+                                      child: SizedBox(
+                                        width: double.infinity,
+                                        height: 60,
+                                        child: ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: Colors.red.shade50
+                                                .withAlpha(15),
+                                            foregroundColor:
+                                                Colors.red.shade300,
+                                            elevation: 0,
+                                            shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(20),
+                                                side: BorderSide(
+                                                    color: Colors.redAccent
+                                                        .withAlpha(50),
+                                                    width: 1.0)),
+                                          ),
+                                          onPressed: () {
+                                            HapticFeedback.lightImpact();
+                                            widget.onLogActivity(
+                                                'Initiated Logout',
+                                                Icons.logout);
+                                            _logout();
+                                          },
+                                          child: const Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.center,
+                                            children: [
+                                              Icon(Icons.logout_rounded,
+                                                  size: 22),
+                                              SizedBox(width: 10),
+                                              Text('Log Out',
+                                                  style: TextStyle(
+                                                      fontWeight:
+                                                          FontWeight.w900,
+                                                      fontSize: 16)),
+                                            ],
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-        ),
-      ],
+          ),
+        ],
+      ),
     );
   }
 }

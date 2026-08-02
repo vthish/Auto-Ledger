@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -32,6 +33,8 @@ class _FinesScreenState extends State<FinesScreen>
   bool _isLoading = true;
   String _errorMessage = '';
 
+  Timer? _paymentTimer;
+
   @override
   void initState() {
     super.initState();
@@ -39,6 +42,13 @@ class _FinesScreenState extends State<FinesScreen>
         TabController(length: 3, vsync: this, initialIndex: widget.initialTab);
     _tabController.addListener(_handleTabChange);
     _fetchFines();
+  }
+
+  @override
+  void dispose() {
+    _paymentTimer?.cancel();
+    _tabController.dispose();
+    super.dispose();
   }
 
   void _handleTabChange() {
@@ -97,6 +107,9 @@ class _FinesScreenState extends State<FinesScreen>
             ? '${officer['name']} (${officer['badge_No']})'
             : 'Unknown Officer';
 
+        final status = f['status'];
+        final hasPayment = f['payment'] != null;
+
         final mappedFine = {
           'id': f['fine_Id'],
           'date': f['issue_At'],
@@ -112,14 +125,15 @@ class _FinesScreenState extends State<FinesScreen>
                     'amount': 0
                   }
                 ],
-          'status': f['status'],
+          'status': status,
           'officer': officerName,
           'comment': f['comment'] ?? '',
           'dueDate': f['due_Date'],
           'payment': f['payment'],
+          'scanLocation': f['scanLocation'],
         };
 
-        if (f['status'] == 'PAID') {
+        if (status == 'PAID' || (status == 'COURT_CASE' && hasPayment)) {
           parsedPaid.add(mappedFine);
         } else {
           parsedPending.add(mappedFine);
@@ -254,10 +268,15 @@ class _FinesScreenState extends State<FinesScreen>
         },
       );
 
-      Future.delayed(const Duration(milliseconds: 2000), () {
+      _paymentTimer?.cancel();
+      _paymentTimer = Timer(const Duration(milliseconds: 2000), () {
         if (mounted) {
-          Navigator.pop(context);
-          _fetchFines();
+          if (Navigator.canPop(context)) {
+            Navigator.of(context).pop();
+          }
+          if (mounted) {
+            _fetchFines();
+          }
         }
       });
     } catch (e) {
@@ -404,12 +423,6 @@ class _FinesScreenState extends State<FinesScreen>
     );
     Navigator.of(context, rootNavigator: true).overlay?.insert(entry);
     Future.delayed(const Duration(seconds: 3), () => entry.remove());
-  }
-
-  @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
   }
 
   String _formatDate(String isoString) {
@@ -822,6 +835,11 @@ class _FinesScreenState extends State<FinesScreen>
         ? const Color(0xFF1A2980).withAlpha(150)
         : Colors.white.withAlpha(60);
 
+    String displayStatus = fine['status'];
+    if (hasPayment && fine['status'] == 'COURT_CASE') {
+      displayStatus = 'PAID - PENDING DH';
+    }
+
     return GestureDetector(
       onTap: (isPending && !isPendingDH)
           ? () => _toggleSelection(fine['id'])
@@ -880,14 +898,14 @@ class _FinesScreenState extends State<FinesScreen>
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: isPendingDH
+                          color: displayStatus == 'PAID - PENDING DH'
                               ? Colors.blue.withAlpha(30)
                               : (isPending
                                   ? Colors.red.withAlpha(30)
                                   : Colors.green.withAlpha(30)),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                              color: isPendingDH
+                              color: displayStatus == 'PAID - PENDING DH'
                                   ? Colors.blue.withAlpha(80)
                                   : (isPending
                                       ? (isOverdue
@@ -899,11 +917,9 @@ class _FinesScreenState extends State<FinesScreen>
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              isPendingDH
-                                  ? 'PAID - PENDING DH'
-                                  : fine['status'],
+                              displayStatus,
                               style: TextStyle(
-                                color: isPendingDH
+                                color: displayStatus == 'PAID - PENDING DH'
                                     ? Colors.blue.shade300
                                     : (isPending
                                         ? (isOverdue
@@ -958,6 +974,28 @@ class _FinesScreenState extends State<FinesScreen>
                                 isOverdue ? Colors.red.shade300 : Colors.white,
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  if (fine['scanLocation'] != null &&
+                      fine['scanLocation'].toString().isNotEmpty) ...[
+                    Row(
+                      children: [
+                        Icon(Icons.location_on_rounded,
+                            size: 14, color: Colors.white70),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            fine['scanLocation'].toString(),
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],
@@ -1298,8 +1336,9 @@ class _FinesScreenState extends State<FinesScreen>
       color: Colors.cyanAccent,
       backgroundColor: Colors.white.withAlpha(30),
       child: ListView.builder(
+        cacheExtent: 500,
         padding: const EdgeInsets.only(
-            top: kToolbarHeight + kTextTabBarHeight + 40,
+            top: kToolbarHeight + kTextTabBarHeight + 56,
             left: 16,
             right: 16,
             bottom: 100),
@@ -1405,144 +1444,94 @@ class _FinesScreenState extends State<FinesScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        _buildGlassBackground(),
-        Scaffold(
-          backgroundColor: Colors.transparent,
-          extendBodyBehindAppBar: true,
-          appBar: AppBar(
-            automaticallyImplyLeading: false,
-            backgroundColor: const Color(0xFF0B0F19).withAlpha(120),
-            flexibleSpace: ClipRect(
-                child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-                    child: Container(color: Colors.transparent))),
-            title: const Text('Traffic Fines',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold)),
-            bottom: TabBar(
-              controller: _tabController,
-              labelColor: Colors.cyanAccent,
-              unselectedLabelColor: Colors.white70,
-              indicatorColor: Colors.cyanAccent,
-              indicatorWeight: 3,
-              tabs: const [
-                Tab(text: 'PENDING'),
-                Tab(text: 'PAID'),
-                Tab(text: 'POINTS'),
-              ],
+    return RepaintBoundary(
+      child: Stack(
+        children: [
+          _buildGlassBackground(),
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            extendBodyBehindAppBar: true,
+            appBar: AppBar(
+              automaticallyImplyLeading: false,
+              backgroundColor: const Color(0xFF0B0F19).withAlpha(120),
+              flexibleSpace: ClipRect(
+                  child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+                      child: Container(color: Colors.transparent))),
+              title: const Text('Traffic Fines',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold)),
+              bottom: TabBar(
+                controller: _tabController,
+                labelColor: Colors.cyanAccent,
+                unselectedLabelColor: Colors.white70,
+                indicatorColor: Colors.cyanAccent,
+                indicatorWeight: 3,
+                tabs: const [
+                  Tab(text: 'PENDING'),
+                  Tab(text: 'PAID'),
+                  Tab(text: 'POINTS'),
+                ],
+              ),
             ),
-          ),
-          body: _isLoading
-              ? const Center(
-                  child: CircularProgressIndicator(color: Colors.white))
-              : _errorMessage.isNotEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.error_outline,
-                              color: Colors.white, size: 50),
-                          const SizedBox(height: 16),
-                          Text(_errorMessage,
-                              style: const TextStyle(
-                                  color: Colors.white, fontSize: 16)),
-                          const SizedBox(height: 16),
-                          ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white.withAlpha(40)),
-                              onPressed: () {
-                                widget.onLogActivity(
-                                    'Retried loading fines', Icons.refresh);
-                                _fetchFines();
-                              },
-                              child: const Text('Retry',
-                                  style: TextStyle(color: Colors.white))),
-                        ],
-                      ),
-                    )
-                  : Stack(
-                      children: [
-                        TabBarView(
-                          controller: _tabController,
+            body: _isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: Colors.white))
+                : _errorMessage.isNotEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // Pending Fines
-                            _pendingFines.isEmpty
-                                ? const Center(
-                                    child: Text("No pending fines available.",
-                                        style: TextStyle(
-                                            color: Colors.white70,
-                                            fontWeight: FontWeight.w500)))
-                                : RefreshIndicator(
-                                    onRefresh: () async {
-                                      widget.onLogActivity(
-                                          'Retried loading fines',
-                                          Icons.refresh);
-                                      await _fetchFines();
-                                    },
-                                    color: Colors.cyanAccent,
-                                    backgroundColor: Colors.white.withAlpha(30),
-                                    child: ListView.builder(
-                                      padding: const EdgeInsets.only(
-                                          top: kToolbarHeight +
-                                              kTextTabBarHeight +
-                                              40,
-                                          left: 16,
-                                          right: 16,
-                                          bottom: 100),
-                                      itemCount: _pendingFines.length,
-                                      physics:
-                                          const AlwaysScrollableScrollPhysics(),
-                                      itemBuilder: (context, index) =>
-                                          _buildFineCard(
-                                              _pendingFines[index], true),
-                                    ),
-                                  ),
-                            // Paid Fines
-                            _paidFines.isEmpty
-                                ? const Center(
-                                    child: Text("No paid fines history.",
-                                        style: TextStyle(
-                                            color: Colors.white70,
-                                            fontWeight: FontWeight.w500)))
-                                : RefreshIndicator(
-                                    onRefresh: () async {
-                                      widget.onLogActivity(
-                                          'Retried loading fines',
-                                          Icons.refresh);
-                                      await _fetchFines();
-                                    },
-                                    color: Colors.cyanAccent,
-                                    backgroundColor: Colors.white.withAlpha(30),
-                                    child: ListView.builder(
-                                      padding: const EdgeInsets.only(
-                                          top: kToolbarHeight +
-                                              kTextTabBarHeight +
-                                              40,
-                                          left: 16,
-                                          right: 16,
-                                          bottom: 100),
-                                      itemCount: _paidFines.length,
-                                      physics:
-                                          const AlwaysScrollableScrollPhysics(),
-                                      itemBuilder: (context, index) =>
-                                          _buildFineCard(
-                                              _paidFines[index], false),
-                                    ),
-                                  ),
-                            // Points History
-                            _buildPointsHistoryTab(),
+                            const Icon(Icons.error_outline,
+                                color: Colors.white, size: 50),
+                            const SizedBox(height: 16),
+                            Text(_errorMessage,
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 16)),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor:
+                                        Colors.white.withAlpha(40)),
+                                onPressed: () {
+                                  widget.onLogActivity(
+                                      'Retried loading fines', Icons.refresh);
+                                  _fetchFines();
+                                },
+                                child: const Text('Retry',
+                                    style: TextStyle(color: Colors.white))),
                           ],
                         ),
-                        Align(
-                          alignment: Alignment.bottomCenter,
-                          child: _buildBulkPaymentBar(),
-                        ),
-                      ],
-                    ),
-        ),
-      ],
+                      )
+                    : Stack(
+                        children: [
+                          TabBarView(
+                            controller: _tabController,
+                            children: [
+                              _PendingFinesList(
+                                pendingFines: _pendingFines,
+                                onRefresh: _fetchFines,
+                                buildCard: _buildFineCard,
+                                onLogActivity: widget.onLogActivity,
+                              ),
+                              _PaidFinesList(
+                                paidFines: _paidFines,
+                                onRefresh: _fetchFines,
+                                buildCard: _buildFineCard,
+                                onLogActivity: widget.onLogActivity,
+                              ),
+                              _buildPointsHistoryTab(),
+                            ],
+                          ),
+                          Align(
+                            alignment: Alignment.bottomCenter,
+                            child: _buildBulkPaymentBar(),
+                          ),
+                        ],
+                      ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1602,6 +1591,116 @@ class _ExpiryDateFormatter extends TextInputFormatter {
     return TextEditingValue(
       text: string,
       selection: TextSelection.collapsed(offset: string.length),
+    );
+  }
+}
+
+class _PendingFinesList extends StatefulWidget {
+  final List<Map<String, dynamic>> pendingFines;
+  final Future<void> Function() onRefresh;
+  final Widget Function(Map<String, dynamic>, bool) buildCard;
+  final void Function(String, IconData) onLogActivity;
+
+  const _PendingFinesList({
+    required this.pendingFines,
+    required this.onRefresh,
+    required this.buildCard,
+    required this.onLogActivity,
+  });
+
+  @override
+  State<_PendingFinesList> createState() => _PendingFinesListState();
+}
+
+class _PendingFinesListState extends State<_PendingFinesList>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    if (widget.pendingFines.isEmpty) {
+      return const Center(
+        child: Text("No pending fines available.",
+            style:
+                TextStyle(color: Colors.white70, fontWeight: FontWeight.w500)),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: widget.onRefresh,
+      color: Colors.cyanAccent,
+      backgroundColor: Colors.white.withAlpha(30),
+      child: ListView.builder(
+        cacheExtent: 500,
+        addAutomaticKeepAlives: false,
+        addRepaintBoundaries: false,
+        padding: const EdgeInsets.only(
+            top: kToolbarHeight + kTextTabBarHeight + 56,
+            left: 16,
+            right: 16,
+            bottom: 100),
+        itemCount: widget.pendingFines.length,
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemBuilder: (context, index) => RepaintBoundary(
+          child: widget.buildCard(widget.pendingFines[index], true),
+        ),
+      ),
+    );
+  }
+}
+
+class _PaidFinesList extends StatefulWidget {
+  final List<Map<String, dynamic>> paidFines;
+  final Future<void> Function() onRefresh;
+  final Widget Function(Map<String, dynamic>, bool) buildCard;
+  final void Function(String, IconData) onLogActivity;
+
+  const _PaidFinesList({
+    required this.paidFines,
+    required this.onRefresh,
+    required this.buildCard,
+    required this.onLogActivity,
+  });
+
+  @override
+  State<_PaidFinesList> createState() => _PaidFinesListState();
+}
+
+class _PaidFinesListState extends State<_PaidFinesList>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    if (widget.paidFines.isEmpty) {
+      return const Center(
+        child: Text("No paid fines history.",
+            style:
+                TextStyle(color: Colors.white70, fontWeight: FontWeight.w500)),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: widget.onRefresh,
+      color: Colors.cyanAccent,
+      backgroundColor: Colors.white.withAlpha(30),
+      child: ListView.builder(
+        cacheExtent: 500,
+        addAutomaticKeepAlives: false,
+        addRepaintBoundaries: false,
+        padding: const EdgeInsets.only(
+            top: kToolbarHeight + kTextTabBarHeight + 56,
+            left: 16,
+            right: 16,
+            bottom: 100),
+        itemCount: widget.paidFines.length,
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemBuilder: (context, index) => RepaintBoundary(
+          child: widget.buildCard(widget.paidFines[index], false),
+        ),
+      ),
     );
   }
 }
